@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "PacketManager.h"
+#include "Utils.h"
 
 namespace PacketManager {
 	BSTR build_cc_packet(std::unordered_map<int, Player*>::iterator player) {
@@ -163,7 +164,10 @@ namespace PacketManager {
 				break;
 		}
 
-		std::ofstream file("C:\\Users\\joaco\\Documents\\dynamic_lib-master\\dynamic_lib\\Debug\\dlib_log.txt", std::ios_base::app);
+		//std::string filePath = Utils::GetDllDirectory() + "\\dlib_log.txt";
+		std::string filePath = "C:\\Users\\joaco\\source\\repos\\nujhiga\\dynamic_libv2\\dlib_log.txt";
+
+		std::ofstream file(filePath, std::ios_base::app);
 
 		if (file.is_open()) {
 			file << packetType << packet + "\n";

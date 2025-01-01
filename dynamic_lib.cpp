@@ -67,8 +67,6 @@ std::string team_mate_name;
 
 std::vector<std::string> packets;
 
-
-
 typedef VOID(WINAPI* PRecvData)(BSTR data);
 PRecvData PFunctionRecv = (PRecvData)0x0084F0E0; //Pointer to where the original HandleData() starts
 
@@ -91,6 +89,7 @@ void InitializeHooks()
 
 	DetourTransactionCommit();
 }
+
 
 VOID WINAPI MyRecvData(BSTR dataRecv)
 {
@@ -150,7 +149,7 @@ VOID WINAPI MyRecvData(BSTR dataRecv)
 		//writePacketLog(packet_str, DLIB);
 		//writePacketLog("EST dec> " + decrypt_packet(packet_str), DLIB);
 	}
-	
+
 	if (StartsWith(dataRecv, L"BP")) {
 
 		std::string packet_str = pm::ConvertBSTRToString(dataRecv).substr(2);
@@ -197,11 +196,11 @@ VOID WINAPI MyRecvData(BSTR dataRecv)
 		}
 		else {
 			Intercept_player_MP(dataRecv);
-
 		}
 	}
 
 	if (wcsstr(dataRecv, L"P9") != NULL) user_paralized = true;
+
 	if (wcsstr(dataRecv, L"P8") != NULL) user_paralized = false;
 
 	if (StartsWith(dataRecv, L"PU"))
@@ -286,10 +285,25 @@ VOID WINAPI MySendData(BSTR* dataSend)
 		}
 	}
 
-	if (wcsstr(*dataSend, L"M1") != NULL) user_pos_y--;
-	if (wcsstr(*dataSend, L"M2") != NULL) user_pos_x++;
-	if (wcsstr(*dataSend, L"M3") != NULL) user_pos_y++;
-	if (wcsstr(*dataSend, L"M4") != NULL) user_pos_x--;
+	if (wcsstr(*dataSend, L"M1") != NULL) {
+		user_pos_y--;
+		CheckNewTargets();
+	}
+
+	if (wcsstr(*dataSend, L"M2") != NULL) {
+		user_pos_x++;
+		CheckNewTargets();
+	}
+
+	if (wcsstr(*dataSend, L"M3") != NULL) {
+		user_pos_y++;
+		CheckNewTargets();
+	}
+
+	if (wcsstr(*dataSend, L"M4") != NULL) {
+		user_pos_x--;
+		CheckNewTargets();
+	}
 
 	pm::writePacketLog(pm::ConvertBSTRToString(*dataSend), pm::DlibLogType::SEND);
 
@@ -911,6 +925,38 @@ std::tuple<int, int> GetClosestTargetPos(const int& posX, const int& posY) {
 
 	return { closestX, closestY };
 }
+
+VOID CheckNewTargets() {
+
+	for (const auto& pm : players_in_map) {
+		if (IsInRange(pm.second->posX, pm.second->posY) && players_in_range.find(pm.second->id) == players_in_range.end())
+		{
+			PlayerRange* pr = new PlayerRange();
+
+			pr->ID = pm.second->id;
+			pr->posX = pm.second->posX;
+			pr->posY = pm.second->posY;
+			pr->faction = pm.second->faction;
+
+			players_in_range.emplace(pm.second->id, pr);
+		}
+		else if (!IsInRange(pm.second->posX, pm.second->posY) && players_in_range.find(pm.second->id) != players_in_range.end()) {
+			RemoveRangePlayer(pm.second->id);
+		}
+	}
+
+	for (const auto& nm : npcsh_in_map) {
+		if (IsInRange(nm.second->posX, nm.second->posY) && npcsh_in_range.find(nm.second->id) == npcsh_in_range.end())
+		{
+			auto xy = std::make_pair(nm.second->posX, nm.second->posY);
+			npcsh_in_range.emplace(nm.second->id, xy);
+		}
+		else if (!IsInRange(nm.second->posX, nm.second->posY) && npcsh_in_range.find(nm.second->id) != npcsh_in_range.end()) {
+			RemoveRangeNpc(nm.second->id);
+		}
+	}
+}
+
 
 std::tuple<std::string, std::string> ReadSpellsInfo(BSTR spell_packet) {
 	// Convert BSTR to std::wstring and then to std::string

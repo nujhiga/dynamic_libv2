@@ -74,6 +74,8 @@ VOID RemoveRangePlayer(std::unordered_map<int, PlayerRange*>::iterator it);
 VOID CleanupMapNpcs();
 VOID CleanupRangeNpcs();
 
+VOID CheckNewTargets();
+
 VOID RemoveMapNpc(const int& nid);
 VOID RemoveRangeNpc(const int& nid);
 
