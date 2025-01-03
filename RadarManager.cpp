@@ -26,13 +26,13 @@ namespace RadarManager {
 
 		InitBrushes();
 		radarHandle = CreateThread(0, 0, (LPTHREAD_START_ROUTINE)RadarRenderThread, 0, 0, 0);
-		runRadar = true;
+		runRadar.store(true);
+
 		return true;
 	}
 
 	void FinalizeRadar() {
-		runRadar = false;
-		Sleep(25);
+		runRadar.store(false);
 
 		WaitForSingleObject(radarHandle, INFINITE);
 		DisposeObjects();
@@ -40,6 +40,17 @@ namespace RadarManager {
 		CloseHandle(radarHandle);
 		radarHandle = nullptr;
 	}
+
+	//void FinalizeRadar() {
+	//	runRadar = false;
+	//	Sleep(25);
+
+	//	WaitForSingleObject(radarHandle, INFINITE);
+	//	DisposeObjects();
+	//	GetExitCodeThread(radarHandle, 0);
+	//	CloseHandle(radarHandle);
+	//	radarHandle = nullptr;
+	//}
 
 	bool SetupRadar(const std::string& windowTitle) {
 
@@ -113,7 +124,7 @@ namespace RadarManager {
 	}
 
 	void RadarRenderThread() {
-		while (runRadar) {
+		while (runRadar.load()) {
 
 			RECT radarWnd;
 			GetClientRect(hWnd, &radarWnd);
