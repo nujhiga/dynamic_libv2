@@ -9,5 +9,6 @@ public:
 	int posY;
 	bool isParalizado;
 	bool isInmovilizado;
+	int body;
 };
 

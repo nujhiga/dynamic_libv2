@@ -27,6 +27,7 @@ public:
 	string name; //inf11
 	int faction; //inf12
 	bool isInvisible; //inf13
+	bool inviDetected;
 
 	int inf14;
 	int inf15;

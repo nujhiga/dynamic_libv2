@@ -23,7 +23,7 @@ namespace PacketManager {
 		LOCAL_RECV,
 		DLIB
 	};
-
+	BSTR build_cc_packet(const std::pair<const int, Player*>& pair);
 	BSTR build_cc_packet(std::unordered_map<int, Player*>::iterator player);
 	BSTR build_cc_packet(const std::vector<std::string>& player_info);
 	BSTR build_v3_packet(const std::vector<std::string>& packet_data);
@@ -37,6 +37,6 @@ namespace PacketManager {
 	std::string ConvertBSTRToString(BSTR bstr);
 	std::string ConvertWCSToMBS(const wchar_t* pstr, long wslen);
 	std::string decrypt_packet(const std::string& message);
-	void writePacketLog(const string& packet, DlibLogType ltype);
+	void writeLog(const string& packet, DlibLogType ltype);
 	std::vector<std::string> split(const std::string& s, char delim);
 }

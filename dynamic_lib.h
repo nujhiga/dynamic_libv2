@@ -22,6 +22,15 @@
 #include "Player.h"
 #include "Npch.h"
 #include "PlayerRange.h"
+#include "RadarManager.h"
+#include "PacketManager.h"
+
+extern std::unordered_map<int, Player*> players_in_map;
+extern int user_pos_x;
+extern int user_pos_y;
+
+extern int sleepRadarThread;
+extern bool playersMapRadarFlag;
 
 void InitializeHooks(void);
 
@@ -31,9 +40,7 @@ int WINAPI MyLoop();
 
 BOOL StartsWith(BSTR sValue, const WCHAR* pszSubValue);
 
-
 std::string hexToString(const std::string& hex);
-
 
 std::tuple<int, int> ReadXY_stoi(BSTR bstr_xy_packet);
 std::tuple<string, string> ReadSpellsInfo(BSTR spell_packet);
@@ -44,7 +51,8 @@ VOID SetManualTarget(const int& posX, const int& posY);
 std::tuple<int, int> GetClosestTargetPos(const int& posX, const int& posY);
 std::tuple<int, int> GetManualTargetPos();
 std::tuple<int, int> GetUserTargetPos();
-//VOID SearchAndSetTarget(int pos_x, int y);
+
+VOID HideCheat();
 VOID MapChanged();
 //VOID AutoRegenHpMan();
 
@@ -56,13 +64,20 @@ VOID Intercept_npch_CR_MP(BSTR packet,
 	const int& pos_x_index, 
 	const int& pos_y_index);
 
+VOID Intercept_CR(BSTR packet);
+VOID Intercept_MP(BSTR packet);
+
+VOID UpdateNpcPos(const int& nid, const int& posX, const int& posY);
+VOID UpdatePlayerPos(const int& pid, const int& posX, const int& posY);
+
 VOID Intercept_player_MP(BSTR packet);
 VOID SendToClient(const std::string& message);
 VOID SendToClient(BSTR message);
 VOID SendToServer(const std::string& message);
-//VOID CastSpell(const int& stype);
+
 VOID AddNpch(const int& nid, const int& posX, const int& posY);
 VOID AddPlayer(const std::vector<std::string>& splitVector);
+VOID AddPlayerRange(const int& pid, const int& posX, const int& posY, const int& faction);
 
 VOID CleanupMapPlayers();
 VOID CleanupRangePlayers();
@@ -80,7 +95,7 @@ VOID RemoveMapNpc(const int& nid);
 VOID RemoveRangeNpc(const int& nid);
 
 BOOL IsInRange(const int& posX, const int& posY);
-BOOL IsWhiteSpell();
+bool IsWhiteSpell();
 
-VOID CasterThread();
+VOID KeyPressThread();
 

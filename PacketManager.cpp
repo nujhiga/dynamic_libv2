@@ -3,6 +3,32 @@
 #include "Utils.h"
 
 namespace PacketManager {
+
+	BSTR build_cc_packet(const std::pair<const int, Player*>& pair) {
+
+		std::ostringstream packetStream;
+		packetStream << "CC"
+			<< pair.second->inf0 << ","
+			<< pair.second->inf1 << ","
+			<< pair.second->inf2 << ","
+			<< pair.second->id << ","
+			<< pair.second->posX << ","
+			<< pair.second->posY << ","
+			<< pair.second->inf6 << ","
+			<< pair.second->inf7 << ","
+			<< pair.second->inf8 << ","
+			<< pair.second->inf9 << ","
+			<< pair.second->inf10 << ","
+			<< pair.second->name << ","
+			<< pair.second->faction << ","
+			<< pair.second->isInvisible << ","
+			<< pair.second->inf14 << ","
+			<< pair.second->inf15;
+
+		return ConvertStringToBSTR(packetStream.str());
+
+	}
+
 	BSTR build_cc_packet(std::unordered_map<int, Player*>::iterator player) {
 		std::ostringstream packetStream;
 		packetStream << "CC"
@@ -139,7 +165,7 @@ namespace PacketManager {
 		return split(packet_str, delim);
 	}
 
-	void writePacketLog(const string& packet, DlibLogType ltype) {
+	void writeLog(const string& packet, DlibLogType ltype) {
 
 		std::string packetType;
 
@@ -165,7 +191,7 @@ namespace PacketManager {
 		}
 
 		//std::string filePath = Utils::GetDllDirectory() + "\\dlib_log.txt";
-		std::string filePath = "C:\\Users\\joaco\\source\\repos\\nujhiga\\dynamic_libv2\\dlib_log.txt";
+		std::string filePath = "C:\\Users\\joaco\\Documents\\dynamic_lib-master\\dlib_log.txt";
 
 		std::ofstream file(filePath, std::ios_base::app);
 
@@ -202,4 +228,5 @@ namespace PacketManager {
 
 		return elems;
 	}
+
 }
