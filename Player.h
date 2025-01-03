@@ -8,6 +8,7 @@ class Player
 {
 public:
 	Player();
+	Player(const std::vector<std::string>& pinfo);
 	~Player();
 
 	int inf0;

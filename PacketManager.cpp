@@ -28,6 +28,28 @@ namespace PacketManager {
 		return ConvertStringToBSTR(packetStream.str());
 
 	}
+	std::string build_CC(const std::pair<const int, Player*>& pair) {
+		std::ostringstream packetStream;
+		packetStream << "CC"
+			<< pair.second->inf0 << ","
+			<< pair.second->inf1 << ","
+			<< pair.second->inf2 << ","
+			<< pair.second->id << ","
+			<< pair.second->posX << ","
+			<< pair.second->posY << ","
+			<< pair.second->inf6 << ","
+			<< pair.second->inf7 << ","
+			<< pair.second->inf8 << ","
+			<< pair.second->inf9 << ","
+			<< pair.second->inf10 << ","
+			<< pair.second->name << ","
+			<< pair.second->faction << ","
+			<< pair.second->isInvisible << ","
+			<< pair.second->inf14 << ","
+			<< pair.second->inf15;
+
+		return packetStream.str();
+	}
 
 	BSTR build_cc_packet(std::unordered_map<int, Player*>::iterator player) {
 		std::ostringstream packetStream;
@@ -51,6 +73,28 @@ namespace PacketManager {
 
 		return ConvertStringToBSTR(packetStream.str());
 	}
+	std::string build_CC(std::unordered_map<int, Player*>::iterator player) {
+		std::ostringstream packetStream;
+		packetStream << "CC"
+			<< player->second->inf0 << ","
+			<< player->second->inf1 << ","
+			<< player->second->inf2 << ","
+			<< player->second->id << ","
+			<< player->second->posX << ","
+			<< player->second->posY << ","
+			<< player->second->inf6 << ","
+			<< player->second->inf7 << ","
+			<< player->second->inf8 << ","
+			<< player->second->inf9 << ","
+			<< player->second->inf10 << ","
+			<< player->second->name << ","
+			<< player->second->faction << ","
+			<< player->second->isInvisible << ","
+			<< player->second->inf14 << ","
+			<< player->second->inf15;
+
+		return packetStream.str();
+	}
 
 	BSTR build_cc_packet(const std::vector<std::string>& player_info) {
 		std::ostringstream packet;
@@ -64,6 +108,18 @@ namespace PacketManager {
 		// Convert to BSTR and return
 		return ConvertStringToBSTR(packet.str());
 	}
+	std::string build_CC(const std::vector<std::string>& player_info) {
+		std::ostringstream packet;
+		packet << "CC";
+
+		for (size_t i = 0; i < player_info.size(); ++i) {
+			if (i > 0) packet << ",";  // Add comma separator
+			packet << player_info[i];
+		}
+
+		return packet.str();
+	}
+
 
 	BSTR build_v3_packet(const std::vector<std::string>& packet_data) {
 
@@ -75,6 +131,22 @@ namespace PacketManager {
 			<< packet_data[3] << ",0";
 
 		return ConvertStringToBSTR(packetStream.str());
+	}
+	std::string build_V3(const std::vector<std::string>& packet_data) {
+		std::ostringstream packetStream;
+		packetStream << "V3"
+			<< packet_data[0] << ","
+			<< packet_data[1] << ","
+			<< packet_data[2] << ","
+			<< packet_data[3] << ",0";
+
+		return packetStream.str();
+	}
+
+	std::string build_BP(int pid) {
+		std::ostringstream packet;
+		packet << "BP" << pid;
+		return packet.str();
 	}
 
 	BSTR build_lac_packet(const int& posX, const int& posY) {
@@ -201,7 +273,7 @@ namespace PacketManager {
 		}
 	}
 
-	string decrypt_packet(const std::string& message)
+	std::string decrypt_packet(const std::string& message)
 	{
 		auto token1 = message[message.length() - 1] - 0xA;
 		auto token2 = message[message.length() - 2] - 0xA;
@@ -217,16 +289,82 @@ namespace PacketManager {
 		return decryptedPacket;
 	}
 
+	//std::vector<std::string> split(const std::string& s, char delim) {
+	//	std::vector<std::string> elems;
+	//	std::stringstream ss(s);
+	//	std::string item;
+	//	while (std::getline(ss, item, delim)) {
+	//		elems.push_back(std::move(item));
+	//	}
+	//	return elems;
+	//}
+
 	std::vector<std::string> split(const std::string& s, char delim) {
 		std::vector<std::string> elems;
-		std::stringstream ss(s);
-		std::string item;
+		size_t start = 0;
+		size_t end = 0;
 
-		while (std::getline(ss, item, delim)) {
-			elems.push_back(std::move(item));
+		while ((end = s.find(delim, start)) != std::string::npos) {
+			elems.push_back(s.substr(start, end - start));
+			start = end + 1;
 		}
 
+		elems.push_back(s.substr(start));  // Add the last substring
+
 		return elems;
+	}
+
+	std::pair<std::string, int> read_SHS(const std::string& packet) {
+
+		size_t firstC = packet.find('C');
+		std::string firstPart = hexToString(packet.substr(0, firstC));
+
+		if (!firstPart.empty()) {
+			firstPart.pop_back();  
+		}
+
+		size_t secondC = packet.find('C', firstC + 1);
+		std::string secondPart = hexToString(packet.substr(firstC + 1, secondC - firstC - 1));
+
+		if (!secondPart.empty()) {
+			secondPart.pop_back();  
+		}
+
+		std::string thirdPart = hexToString(packet.substr(secondC + 1));
+
+		return { thirdPart, stoi(firstPart) };
+	}
+
+	std::tuple<int, int> read_PU(const string& packet) {
+
+		// Find the position of 'C' that separates the two parts
+		size_t paquete_hex_0_len = packet.find(L'C');
+
+		// Convert wstring to string for the first part (paquete_hex_0)
+		std::string paquete_hex_0(packet.begin(), packet.begin() + paquete_hex_0_len);
+
+		// Convert wstring to string for the second part (paquete_hex_1)
+		std::string paquete_hex_1(packet.begin() + paquete_hex_0_len + 1, packet.end());
+
+		// Convert the hex strings to regular strings
+		std::string hex_str_0 = hexToString(paquete_hex_0);
+		std::string hex_str_1 = hexToString(paquete_hex_1);
+
+		// Convert hex strings to integers
+		int posX = std::stoi(hex_str_0);
+		int posY = std::stoi(hex_str_1);
+
+		return std::make_tuple(posX, posY);
+	}
+
+	std::string ConvertBSTRPacket(BSTR packet, int opCodeLength) {
+		std::string strPacket = ConvertBSTRToString(packet);
+		
+		if (opCodeLength > 0) {
+			strPacket.erase(0, opCodeLength);	
+		}
+
+		return strPacket;
 	}
 
 }

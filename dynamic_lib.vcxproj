@@ -84,6 +84,7 @@
   <ItemGroup>
     <ClInclude Include="dynamic_lib.h" />
     <ClInclude Include="detours.h" />
+    <ClInclude Include="Globals.h" />
     <ClInclude Include="RadarManager.h" />
     <ClInclude Include="Npch.h" />
     <ClInclude Include="PacketManager.h" />

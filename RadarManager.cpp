@@ -19,28 +19,29 @@ namespace RadarManager {
 	HBRUSH blackBrush;
 	HBRUSH playerBrush;
 
-	BOOL InitRadar(const std::string& windowTitle) {
-		if (SetupRadar(windowTitle)) {
-			InitBrushes();
-			radarHandle = CreateThread(0, 0, (LPTHREAD_START_ROUTINE)RadarRenderThread, 0, 0, 0);
-			return true;
-		}
-		else {
-			return false;
-		}
+	std::atomic<bool> runRadar{ false };
+
+	bool InitRadar(const std::string& windowTitle) {
+		if (!SetupRadar(windowTitle)) return false;
+
+		InitBrushes();
+		radarHandle = CreateThread(0, 0, (LPTHREAD_START_ROUTINE)RadarRenderThread, 0, 0, 0);
+		runRadar = true;
+		return true;
 	}
 
-	VOID FinalizeRadar() {
+	void FinalizeRadar() {
+		runRadar = false;
+		Sleep(25);
 
 		WaitForSingleObject(radarHandle, INFINITE);
+		DisposeObjects();
 		GetExitCodeThread(radarHandle, 0);
 		CloseHandle(radarHandle);
 		radarHandle = nullptr;
-		//TerminateThread(RadarRenderThread, 0);
-		DisposeObjects();
 	}
 
-	BOOL SetupRadar(const std::string& windowTitle) {
+	bool SetupRadar(const std::string& windowTitle) {
 
 		std::wstring wndTitle(windowTitle.begin(), windowTitle.end());
 		hWnd = FindWindow(NULL, wndTitle.c_str());
@@ -66,7 +67,7 @@ namespace RadarManager {
 		return true;
 	}
 
-	VOID InitBrushes() {
+	void InitBrushes() {
 		radarBrush = CreateSolidBrush(RGB(0, 255, 0));
 		neutralBrush = CreateSolidBrush(RGB(127, 127, 127));
 		ciudasBrush = CreateSolidBrush(RGB(0, 162, 232));
@@ -77,7 +78,7 @@ namespace RadarManager {
 		playerBrush = CreateSolidBrush(RGB(0, 0, 255));
 	}
 
-	VOID ReleaseBrushes() {
+	void ReleaseBrushes() {
 
 		DeleteObject(radarBrush);
 		radarBrush = nullptr;
@@ -105,14 +106,14 @@ namespace RadarManager {
 
 	}
 
-	VOID DisposeObjects() {
+	void DisposeObjects() {
 		ReleaseBrushes();
 		DeleteDC(hdcCompatible);
 		ReleaseDC(hWnd, hdcWindow);
 	}
 
-	VOID RadarRenderThread() {
-		while (true) {
+	void RadarRenderThread() {
+		while (runRadar) {
 
 			RECT radarWnd;
 			GetClientRect(hWnd, &radarWnd);
@@ -134,60 +135,31 @@ namespace RadarManager {
 				FrameRect(hdcWindow, &userVision, blackBrush);
 			}
 
-			//Sleep(sleepRadarThread);
-
 			for (const auto& pl : players_in_map) {
-				if (pl.second) {
+				if (!pl.second) continue;
 
-					RECT player = { pl.second->posX, pl.second->posY, pl.second->posX + 3, pl.second->posY + 3 };
+				RECT player = { pl.second->posX, pl.second->posY, pl.second->posX + 3, pl.second->posY + 3 };
 
-					switch (pl.second->faction) {
-						case 5: case 21:
-							FillRect(hdcWindow, &player, neutralBrush);
-							break;
-						case 2:
-							FillRect(hdcWindow, &player, ciudasBrush);
-							break;
-						case 3: case 23:
-							FillRect(hdcWindow, &player, crimisBrush);
-							break;
-						case 1:
-							FillRect(hdcWindow, &player, gmsBrush);
-							break;
-						default:
-							FillRect(hdcWindow, &player, unknownBrush);
-					}
+				switch (pl.second->faction) {
+					case 5: case 21:
+						FillRect(hdcWindow, &player, neutralBrush);
+						break;
+					case 2:
+						FillRect(hdcWindow, &player, ciudasBrush);
+						break;
+					case 3: case 23:
+						FillRect(hdcWindow, &player, crimisBrush);
+						break;
+					case 1:
+						FillRect(hdcWindow, &player, gmsBrush);
+						break;
+					default:
+						FillRect(hdcWindow, &player, unknownBrush);
 				}
+
 			}
 
 			Sleep(50);
-
-			/*if (!players_in_map.empty()) {
-				for (const auto& pl : players_in_map) {
-					if (pl.second) {
-
-						RECT player = { pl.second->posX, pl.second->posY, pl.second->posX + 3, pl.second->posY + 3 };
-
-						switch (pl.second->faction) {
-							case 5: case 21:
-								FillRect(hdcWindow, &player, neutralBrush);
-								break;
-							case 2:
-								FillRect(hdcWindow, &player, ciudasBrush);
-								break;
-							case 3: case 23:
-								FillRect(hdcWindow, &player, crimisBrush);
-								break;
-							case 1:
-								FillRect(hdcWindow, &player, gmsBrush);
-								break;
-							default:
-								FillRect(hdcWindow, &player, unknownBrush);
-						}
-					}
-				}
-			}*/
-			
 		}
 	}
 
