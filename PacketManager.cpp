@@ -4,6 +4,25 @@
 
 namespace PacketManager {
 
+	std::string OPCodeStr(const OPCode& ocode) {
+		int idx = static_cast<int>(ocode);
+
+		return (idx >= 0 && idx < static_cast<int>(OPCode::COUNT)) ?
+			OPCodeNames[idx] : "Unknown";
+	}
+
+	std::string BuildPCK(const OPCode& ocode, const std::vector<int>& args) {
+		std::ostringstream packet;
+		packet << OPCodeStr(ocode);
+
+		for (size_t i = 0; i < args.size(); ++i) {
+			if (i > 0) 	packet << ",";
+			packet << args[i];
+		}
+
+		return packet.str();
+	}
+
 	std::string build_CC(const Player& player) {
 		std::ostringstream packetStream;
 		packetStream << "CC"
@@ -78,22 +97,16 @@ namespace PacketManager {
 		return packet.str();
 	}
 
-	BSTR build_lac_packet(const int& posX, const int& posY) {
+	std::string build_LC(int posX, int posY) {
 		std::ostringstream packet;
-		packet << "LC" << std::to_string(posX) << "," << std::to_string(posY);
-		return ConvertStringToBSTR(packet.str());
+		packet << "LC" << posX << "," << posY;
+		return packet.str();
 	}
 
-	BSTR build_wlc_packet(const int& posX, const int& posY) {
+	std::string build_WLC(int posX, int posY, int wlct) {
 		std::ostringstream packet;
-		packet << "WLC" << posX << "," << posY << ",1";
-		return ConvertStringToBSTR(packet.str());
-	}
-
-	BSTR build_qdl_packet(const int& pid) {
-		std::ostringstream packet;
-		packet << "QDL" << pid;
-		return ConvertStringToBSTR(packet.str());
+		packet << "WLC" << posX << "," << posY << "," << wlct;
+		return packet.str();
 	}
 
 	BSTR build_console_packet(const std::string& message, ConsoleMessageType mtype) {
@@ -116,12 +129,6 @@ namespace PacketManager {
 		if (message.empty()) return nullptr;
 
 		return ConvertStringToBSTR(std::string().append("||DLIB>> ").append(message).append(get_message_color(mtype)));
-	}
-
-	BSTR build_bp_packet(const int& pid) {
-		std::ostringstream packet;
-		packet << "BP" << pid;
-		return ConvertStringToBSTR(packet.str());
 	}
 
 	std::string build_TW(int wav, int posX, int posY) {
@@ -251,14 +258,14 @@ namespace PacketManager {
 		std::string firstPart = hexToString(packet.substr(0, firstC));
 
 		if (!firstPart.empty()) {
-			firstPart.pop_back();  
+			firstPart.pop_back();
 		}
 
 		size_t secondC = packet.find('C', firstC + 1);
 		std::string secondPart = hexToString(packet.substr(firstC + 1, secondC - firstC - 1));
 
 		if (!secondPart.empty()) {
-			secondPart.pop_back();  
+			secondPart.pop_back();
 		}
 
 		std::string thirdPart = hexToString(packet.substr(secondC + 1));
@@ -290,9 +297,9 @@ namespace PacketManager {
 
 	std::string ConvertBSTRPacket(BSTR packet, int opCodeLength) {
 		std::string strPacket = ConvertBSTRToString(packet);
-		
+
 		if (opCodeLength > 0) {
-			strPacket.erase(0, opCodeLength);	
+			strPacket.erase(0, opCodeLength);
 		}
 
 		return strPacket;

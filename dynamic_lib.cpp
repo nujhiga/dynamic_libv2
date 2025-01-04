@@ -29,6 +29,8 @@ int user_faction = 0;
 bool user_paralized = false;
 bool user_meditando = false;
 
+std::atomic<bool> puLockMov{ false };
+
 const std::string user_name = "growland";
 const std::string del_spell_words = ";1 ";
 
@@ -47,9 +49,9 @@ const std::string Cele = "Celeridad";
 const std::string Fue = "Fuerza";
 const std::string EleA = "Invocar elemental de agua";
 
-const std::string CMD_MEDITAR = "MEDITAR";
+const std::string CMD_MEDITAR = "meditar";
 
-bool cancel_medit = false;
+bool cancel_medit = true;
 
 bool uk_flag = false;
 bool lh_flag = false;
@@ -133,7 +135,6 @@ VOID WINAPI MyRecvData(BSTR dataRecv)
 	if (StartsWith(dataRecv, L"V3")) {
 		std::string packet = pm::ConvertBSTRPacket(dataRecv, 2);
 		Intercept_V3(dataRecv, packet);
-		//	recv_tempWriteLogs = false;
 	}
 
 	//ToDo :: if (StartsWith(dataRecv, L"EST")) 
@@ -174,11 +175,9 @@ VOID WINAPI MyRecvData(BSTR dataRecv)
 		recv_tempWriteLogs = false;
 	}
 
-	if (StartsWith(dataRecv, L"PU"))
-	{
+	if (StartsWith(dataRecv, L"PU")) {
 		std::string packet = pm::ConvertBSTRPacket(dataRecv, 2);
 		Intercept_PU(packet);
-		recv_tempWriteLogs = false;
 	}
 
 	if (StartsWith(dataRecv, L"SHS")) {
@@ -200,62 +199,19 @@ VOID WINAPI MySendData(BSTR* dataSend)
 	__asm PUSHAD;
 	__asm PUSHFD;
 
-	send_tempWriteLogs = true;
-
 	if (StartsWith(*dataSend, L"WLC")) {
-
-		std::vector<string> splitVector = pm::split(pm::ConvertBSTRToString(*dataSend).substr(3), ',');
-
-		int posX = 0, posY = 0;
-		posX = stoi(splitVector[0]);
-		posY = stoi(splitVector[1]);
-
-		if (splitVector[2] == "1" && !IsSelectedLH(EleA)) {
-
-			if (uk_flag && lh_flag) {
-				int _posX = -1, _posY = -1;
-				std::tuple<int, int> xy = std::make_tuple(-1, -1);
-
-				if (auto_cast_flag) {
-					xy = GetUserTargetPos();
-				}
-				else if (cast_mode == 0) {
-					xy = GetClosestTargetPos(posX, posY);
-				}
-				else if (cast_mode == 1 && selected_player_id > 0) {
-					xy = GetManualTargetPos();
-				}
-
-				_posX = std::get<0>(xy);
-				_posY = std::get<1>(xy);
-
-				if (_posX == -1 || _posY == -1) {
-					_posX = posX;
-					_posY = posY;
-				}
-
-				SysFreeString(*dataSend);
-				*dataSend = pm::build_wlc_packet(_posX, _posY);
-				cast_target = 0;
-			}
-			else {
-				SysFreeString(*dataSend);
-				*dataSend = pm::build_lac_packet(user_pos_x, user_pos_y);
-			}
-		}
-		send_tempWriteLogs = false;
+		std::string packet = pm::ConvertBSTRPacket(*dataSend, 3);
+		Intercept_WLC(dataSend, packet);
 	}
 
 	if (StartsWith(*dataSend, L"UK1")) {
 		uk_flag = true;
-		send_tempWriteLogs = false;
 	}
 
 	if (StartsWith(*dataSend, L"LH")) {
-		std::string packet_str = pm::ConvertBSTRToString(*dataSend);
-		selected_lh = stoi(packet_str.substr(2));
+		std::string packet = pm::ConvertBSTRPacket(*dataSend, 2);
+		selected_lh = stoi(packet);
 		lh_flag = true;
-		send_tempWriteLogs = false;
 	}
 
 	if (StartsWith(*dataSend, L"LC")) {
@@ -271,29 +227,11 @@ VOID WINAPI MySendData(BSTR* dataSend)
 		Intercept_M1234(packet);
 	}
 
-	//if (wcsstr(*dataSend, L"M1") != NULL) {
-	//	user_pos_y--;
-	//	CheckNewTargets();
-	//	send_tempWriteLogs = false;
-	//}
-	//if (wcsstr(*dataSend, L"M2") != NULL) {
-	//	user_pos_x++;
-	//	CheckNewTargets();
-	//	send_tempWriteLogs = false;
-	//}
-	//if (wcsstr(*dataSend, L"M3") != NULL) {
-	//	user_pos_y++;
-	//	CheckNewTargets();
-	//	send_tempWriteLogs = false;
-	//}
-	//if (wcsstr(*dataSend, L"M4") != NULL) {
-	//	user_pos_x--;
-	//	CheckNewTargets();
-	//	send_tempWriteLogs = false;
-	//}
+	if (StartsWith(*dataSend, L"RPU")) {
+		puLockMov.store(true);
+	}
 
 	if (writeLogs) pm::writeLog(pm::ConvertBSTRToString(*dataSend), pm::LogType::SEND);
-	//if (send_tempWriteLogs) pm::writeLog(pm::ConvertBSTRToString(*dataSend), pm::DlibLogType::RECV);
 
 	PFunctionSend(dataSend);
 
@@ -310,7 +248,7 @@ int WINAPI MyLoop()
 
 	if (currentTime - oldTTeclas > 100) {
 
-		if ((GetKeyState(VK_DIVIDE) & 0x100) != 0) {
+		if ((GetKeyState(VK_MULTIPLY) & 0x100) != 0) {
 
 			if (!isRadarRunning) {
 				isRadarRunning = rm::InitRadar("Untitled - Notepad");
@@ -334,10 +272,13 @@ int WINAPI MyLoop()
 		if ((GetKeyState(VK_XBUTTON1) & 0x100) != 0) {
 			SendToServer(del_spell_words);
 		}
-
-		if ((GetKeyState(VK_INSERT) & 0x100) != 0) {
-
+		
+		if ((GetKeyState(VK_DELETE) & 0x100) != 0) {
+			
 		}
+		
+		//if ((GetKeyState(VK_INSERT) & 0x100) != 0) {
+		//}
 
 		oldTTeclas = GetTickCount();
 
@@ -381,18 +322,6 @@ void HideCheat(bool finalizeRadar) {
 			SendToClient(pm::build_CC(player));
 		}
 	}
-	//for (const auto& pl : players_in_map) {
-	//	if (!pl.second) continue;
-	//	if (pl.second->inviDetected) {
-	//		pl.second->name = pl.second->orgName;
-	//		pl.second->isInvisible = true;
-	//		pl.second->inviDetected = false;
-	//		SendToClient(pm::build_BP(pl.first));
-	//		SendToClient(pm::build_cc_packet(pl));
-	//		//SendToClient(pm::build_bp_packet(pl.first));
-	//		//SendToClient(pm::build_cc_packet(pl));
-	//	}
-	//}
 	Sleep(25);
 }
 
@@ -644,6 +573,7 @@ void Intercept_PU(const std::string& packet) {
 	auto xy = pm::read_PU(packet);
 	user_pos_x = std::get<0>(xy);
 	user_pos_y = std::get<1>(xy);
+	puLockMov.store(false);
 }
 
 void Intercept_LC(const std::string& packet) {
@@ -714,47 +644,14 @@ void Intercept_V3(BSTR& dataRecv, const std::string& packet) {
 	}
 }
 
-//void Intercept_V3(BSTR& dataRecv, const std::string& packet) {
-//	std::string dcpt_packet = pm::decrypt_packet(packet);
-//	auto pinfo = pm::split(dcpt_packet, ',');
-//
-//	int pid = stoi(pinfo[1]);
-//
-//	if (pid == user_id) return;
-//
-//	auto itp = players_in_map.find(pid);
-//
-//	if (itp != players_in_map.end()) {			
-//		itp->second->isInvisible = stoi(pinfo[4]) == 1;
-//
-//		if (!hideCheating && itp->second->isInvisible) {
-//			itp->second->name += " [I]";
-//			itp->second->isInvisible = false;
-//			itp->second->inviDetected = true;
-//
-//			SendToClient(pm::build_BP(pid));
-//			SendToClient(pm::build_CC(itp));
-//
-//			SysFreeString(dataRecv);
-//			dataRecv = pm::ConvertStringToBSTR(pm::build_V3(pinfo));
-//		}
-//		else {
-//			itp->second->name = itp->second->orgName;
-//			itp->second->inviDetected = false;
-//
-//			SendToClient(pm::build_BP(pid));
-//			SendToClient(pm::build_CC(itp));
-//		}
-//	}
-//}
-
 void Intercept_M1234(const std::string& packet) {
 
+	if (puLockMov.load()) return;
 	if (user_paralized || (!cancel_medit && user_meditando)) return;
 
-	if (cancel_medit && user_meditando) {
-		SendToServer(pm::build_CMD(CMD_MEDITAR));
-	}
+	//if (cancel_medit && user_meditando) {
+	//	SendToServer(pm::build_CMD(CMD_MEDITAR));
+	//}
 
 	int dir = stoi(packet);
 	switch (dir)
@@ -784,6 +681,41 @@ void Intercept_BP(const std::string& packet) {
 	RemoveMapNpc(eid);
 }
 
+void Intercept_WLC(BSTR* dataSend, const std::string packet) {
+
+	auto pinfo = pm::split(packet, ',');
+
+	int posX = stoi(pinfo[0]);
+	int posY = stoi(pinfo[1]);
+
+	if (pinfo[2] == "1" && !IsSelectedLH(EleA)) {
+
+		int _posX = -1, _posY = -1;
+		std::tuple<int, int> xy = { -1, -1 };
+
+		if (auto_cast_flag) {
+			xy = GetUserTargetPos();
+		}
+		else if (cast_mode == 0) {
+			xy = GetClosestTargetPos(posX, posY);
+		}
+		else if (cast_mode == 1 && selected_player_id > 0) {
+			xy = GetManualTargetPos();
+		}
+
+		_posX = std::get<0>(xy);
+		_posY = std::get<1>(xy);
+
+		if (_posX == -1 || _posY == -1) {
+			_posX = posX;
+			_posY = posY;
+		}
+
+		SysFreeString(*dataSend);
+		*dataSend = pm::ConvertStringToBSTR(pm::build_WLC(_posX, _posY));
+	}
+}
+
 bool IsInRange(int posX, int posY) {
 	bool xrange = std::abs(posX - user_pos_x) <= 11;
 	bool yrange = std::abs(posY - user_pos_y) <= 9;
@@ -809,8 +741,6 @@ std::tuple<int, int> GetUserTargetPos() {
 std::tuple<int, int> GetClosestTargetPos(int posX, int posY) {
 
 	int closestX = -1, closestY = -1;
-
-	//const double maxDistance = 8;
 	double minDistance = 8;
 
 	auto updateClosest = [&](int targetX, int targetY) {
@@ -841,7 +771,7 @@ std::tuple<int, int> GetClosestTargetPos(int posX, int posY) {
 	return { closestX, closestY };
 }
 
-//Todo review cheknewtarg
+//ToDo review cheknewtarg
 void CheckNewTargets() {
 	// Process players in the map
 	for (const auto& pm : players_in_map) {

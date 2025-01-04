@@ -91,6 +91,8 @@ void Intercept_M1234(const std::string& packet);
 
 void Intercept_BP(const std::string& packet);
 
+void Intercept_WLC(BSTR* dataSend, const std::string packet);
+
 bool IsInRange(int posX, int posY);
 
 std::tuple<int, int> GetClosestTargetPos(int posX, int posY);

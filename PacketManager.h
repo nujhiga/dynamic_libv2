@@ -5,6 +5,8 @@
 #include <string>
 #include <fstream>
 #include <comutil.h>
+#include <iostream>
+#include <array>
 
 namespace PacketManager {
 
@@ -23,10 +25,26 @@ namespace PacketManager {
 		DLIB
 	};
 
+	enum class OPCode {
+		CC,
+		V3,
+		BP,
+		TW,
+		LC,
+		COUNT
+	};
+
+	constexpr std::array<const char*, static_cast<int>(OPCode::COUNT)>
+		OPCodeNames = { "CC", "V3", "BP", "TW", "LC" };
+
+	std::string OPCodeStr(const OPCode& ocode);
+
+	std::string BuildPCK(const OPCode& ocode, const std::vector<int>& args);
+
 	std::string build_CC(const Player& player);
-	
+
 	std::string build_CC(const std::pair<const int, Player*>& pair);
-	
+
 	std::string build_CC(const std::vector<std::string>& player_info);
 
 	std::string build_V3(const std::vector<std::string>& packet_data);
@@ -34,15 +52,21 @@ namespace PacketManager {
 	std::string build_BP(int pid);
 
 	std::string build_TW(int wav, int posX, int posY);
-	
+
 	std::string build_CMD(const std::string& command);
 
-	std::string build_LC();
+	std::string build_LC(int posX, int posY);
+	std::string build_WLC(int posX, int posY, int wlct = 1);
 
-	BSTR build_lac_packet(const int& posX, const int& posY);
-	BSTR build_wlc_packet(const int& posX, const int& posY);
-	BSTR build_qdl_packet(const int& pid);
+	//BSTR build_lac_packet(const int& posX, const int& posY);
+	//BSTR build_wlc_packet(const int& posX, const int& posY);
+	//BSTR build_qdl_packet(const int& pid);
 	BSTR build_console_packet(const std::string& message, ConsoleMessageType mtype = ConsoleMessageType::INFO);
+
+
+
+
+
 	std::vector<std::string> packet_split(BSTR packet, int subStrOffset = 0, int subStrCharCount = 0, char delim = ',');
 	BSTR ConvertStringToBSTR(const std::string& str);
 	std::string ConvertBSTRToString(BSTR bstr);

@@ -157,7 +157,7 @@ namespace RadarManager {
 
 			RenderPlayers();
 			
-			Sleep(75);
+			Sleep(125);
 		}
 
 		DeleteObject(hFont);
