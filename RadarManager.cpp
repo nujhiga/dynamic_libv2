@@ -65,19 +65,19 @@ namespace RadarManager {
 		hWnd = FindWindow(NULL, wndTitle.c_str());
 
 		if (hWnd == NULL) {
-			pm::writeLog("RadarManager - Failed to find window: " + windowTitle, pm::LogType::DLIB);
+		//	pm::writeLog("RadarManager - Failed to find window: " + windowTitle, pm::LogType::DLIB);
 			return false;
 		}
 
 		hdcWindow = GetDC(hWnd);
 		if (hdcWindow == NULL) {
-			pm::writeLog("RadarManager - Failed to get DC", pm::LogType::DLIB);
+			//pm::writeLog("RadarManager - Failed to get DC", pm::LogType::DLIB);
 			return false;
 		}
 
 		hdcCompatible = CreateCompatibleDC(hdcWindow);
 		if (hdcCompatible == NULL) {
-			pm::writeLog("RadarManager - Failed to create compatible HDC", pm::LogType::DLIB);
+		//	pm::writeLog("RadarManager - Failed to create compatible HDC", pm::LogType::DLIB);
 			ReleaseDC(hWnd, hdcWindow);
 			return false;
 		}

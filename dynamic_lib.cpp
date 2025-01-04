@@ -3,6 +3,8 @@
 namespace pm = PacketManager;
 namespace rm = RadarManager;
 
+using dlog = DlibLogger;
+
 #pragma comment(lib, "comsuppw.lib")
 
 DWORD oldTTeclas = GetTickCount();
@@ -12,8 +14,9 @@ bool isRadarRunning = false;
 bool isKeyPressRunning = false;
 bool hideCheating = false;
 bool writeLogs = true;
-bool recv_tempWriteLogs = false;
-bool send_tempWriteLogs = false;
+
+//bool recv_tempWriteLogs = false;
+//bool send_tempWriteLogs = false;
 
 int cast_mode = 0;
 int cast_target = 0;
@@ -84,6 +87,9 @@ std::string team_mate_name;
 
 std::vector<std::string> packets;
 
+const std::string LOG_FILEPATH = "C:\\Users\\joaco\\Documents\\dlib_log.txt";
+dlog dlg(LOG_FILEPATH);
+
 typedef VOID(WINAPI* PRecvData)(BSTR data);
 PRecvData PFunctionRecv = (PRecvData)0x0084F0E0; //Pointer to where the original HandleData() starts
 
@@ -96,6 +102,8 @@ PLoop PFunctionLoop = (PLoop)GetProcAddress(dllModule, "rtcDoEvents");
 
 void InitializeHooks()
 {
+	//dlg.startLogging();
+
 	DetourTransactionBegin();
 
 	DetourUpdateThread(GetCurrentThread());
@@ -151,13 +159,11 @@ VOID WINAPI MyRecvData(BSTR dataRecv)
 	if (StartsWith(dataRecv, L"CC")) {
 		std::string packet = pm::ConvertBSTRPacket(dataRecv, 2);
 		Intercept_CC(dataRecv, packet);
-		//recv_tempWriteLogs = false;
 	}
 
 	if (StartsWithAndNot(dataRecv, L"CR", L"CRA")) {
 		std::string packet = pm::ConvertBSTRPacket(dataRecv, 2);
 		Intercept_CR(packet);
-		recv_tempWriteLogs = false;
 	}
 
 	if (StartsWith(dataRecv, L"MP")) {
@@ -167,12 +173,10 @@ VOID WINAPI MyRecvData(BSTR dataRecv)
 
 	if (wcsstr(dataRecv, L"P9")) {
 		user_paralized = true;
-		recv_tempWriteLogs = false;
 	}
 
 	if (wcsstr(dataRecv, L"P8")) {
 		user_paralized = false;
-		recv_tempWriteLogs = false;
 	}
 
 	if (StartsWith(dataRecv, L"PU")) {
@@ -183,10 +187,10 @@ VOID WINAPI MyRecvData(BSTR dataRecv)
 	if (StartsWith(dataRecv, L"SHS")) {
 		std::string packet = pm::ConvertBSTRPacket(dataRecv, 3);
 		Intercept_SHS(packet);
-		recv_tempWriteLogs = false;
 	}
 
-	if (writeLogs) pm::writeLog(pm::ConvertBSTRToString(dataRecv), pm::LogType::RECV);
+	if (writeLogs) dlg.logData(pm::ConvertBSTRToString(dataRecv), DlibLogger::LogType::RECV);		
+	//pm::writeLog(pm::ConvertBSTRToString(dataRecv), pm::LogType::RECV);
 
 	PFunctionRecv(dataRecv);
 
@@ -219,7 +223,6 @@ VOID WINAPI MySendData(BSTR* dataSend)
 			std::string packet = pm::ConvertBSTRPacket(*dataSend, 2);
 			Intercept_LC(packet);
 		}
-		send_tempWriteLogs = false;
 	}
 
 	if (StartsWith(*dataSend, { L"M1",L"M2", L"M3", L"M4" })) {
@@ -231,7 +234,8 @@ VOID WINAPI MySendData(BSTR* dataSend)
 		puLockMov.store(true);
 	}
 
-	if (writeLogs) pm::writeLog(pm::ConvertBSTRToString(*dataSend), pm::LogType::SEND);
+	if (writeLogs) dlg.logData(pm::ConvertBSTRToString(*dataSend), DlibLogger::LogType::SEND);
+	//pm::writeLog(pm::ConvertBSTRToString(*dataSend), pm::LogType::SEND);
 
 	PFunctionSend(dataSend);
 
@@ -272,11 +276,11 @@ int WINAPI MyLoop()
 		if ((GetKeyState(VK_XBUTTON1) & 0x100) != 0) {
 			SendToServer(del_spell_words);
 		}
-		
+
 		if ((GetKeyState(VK_DELETE) & 0x100) != 0) {
-			
+
 		}
-		
+
 		//if ((GetKeyState(VK_INSERT) & 0x100) != 0) {
 		//}
 
@@ -853,26 +857,17 @@ VOID AutoRegenHpMan()
 	}
 }*/
 
-VOID SendToClient(const std::string& message)
+VOID SendToClient(const std::string& packet)
 {
 	try
 	{
-		//
-		//// Create Packet
-		//
-		BSTR recvPacket = pm::ConvertStringToBSTR(message);
-		//OutputDebugStringW(ConvertStringToBSTR("SendToClient: " + ConvertBSTRToString(recvPacket)));
-		//
-		//// Send Packet
-		//
-		//writelrFile(recvPacket);
+		if (writeLogs) dlg.logData(packet, DlibLogger::LogType::LOCAL_RECV);
+		//pm::writeLog(message, pm::LogType::LOCAL_RECV);
 
-		if (writeLogs) pm::writeLog(message, pm::LogType::LOCAL_RECV);
+		BSTR recvPacket = pm::ConvertStringToBSTR(packet);
 
 		PFunctionRecv(recvPacket);
-		//
-		//// Free Packet
-		//
+
 		SysFreeString(recvPacket);
 	}
 	catch (int e)
@@ -880,50 +875,17 @@ VOID SendToClient(const std::string& message)
 	}
 }
 
-VOID SendToClient(BSTR recvPacket)
+VOID SendToServer(const std::string& packet)
 {
 	try
 	{
-		//
-		//// Create Packet
-		//
-		//OutputDebugStringW(ConvertStringToBSTR("SendToClient: " + ConvertBSTRToString(recvPacket)));
-		//
-		//// Send Packet
-		//
-		//writelrFile(recvPacket);
+		if (writeLogs) dlg.logData(packet, DlibLogger::LogType::LOCAL_SEND);
+		//pm::writeLog(message, pm::LogType::LOCAL_SEND);
 
-		if (writeLogs) pm::writeLog(pm::ConvertBSTRToString(recvPacket), pm::LogType::LOCAL_RECV);
+		BSTR convertedSend = pm::ConvertStringToBSTR(packet);
 
-		PFunctionRecv(recvPacket);
-		//
-		//// Free Packet
-		//
-		SysFreeString(recvPacket);
-	}
-	catch (int e)
-	{
-	}
-}
-
-VOID SendToServer(const std::string& message)
-{
-	try
-	{
-		if (writeLogs) pm::writeLog(message, pm::LogType::LOCAL_SEND);
-
-		//
-		//// Create Packet
-		//
-		BSTR convertedSend = pm::ConvertStringToBSTR(message);
-		//OutputDebugStringW(ConvertStringToBSTR("SendToServer: " + ConvertBSTRToString(convertedSend)));
-		//
-		//// Send Packet
-		//
 		PFunctionSend(&convertedSend);
-		//
-		//// Free Packet
-		//
+
 		SysFreeString(convertedSend);
 	}
 	catch (int e)

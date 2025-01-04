@@ -25,6 +25,7 @@
 #include "PlayerRange.h"
 #include "RadarManager.h"
 #include "PacketManager.h"
+#include "DlibLogger.h"
 #include "mutex"
 
 //ToDo move to globals file
@@ -104,6 +105,5 @@ void CheckNewTargets();
 void PlayLocalWav(int wav);
 
 VOID SendToClient(const std::string& message);
-VOID SendToClient(BSTR message);
 VOID SendToServer(const std::string& message);
 

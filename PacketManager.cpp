@@ -184,43 +184,7 @@ namespace PacketManager {
 
 		return split(packet_str, delim);
 	}
-
-	void writeLog(const string& packet, LogType ltype) {
-
-		std::string packetType;
-
-		switch (ltype)
-		{
-			case LogType::SEND:
-				packetType = "SEND > ";
-				break;
-			case LogType::RECV:
-				packetType = "RECV < ";
-				break;
-			case LogType::LOCAL_SEND:
-				packetType = "L_SEND > ";
-				break;
-			case LogType::LOCAL_RECV:
-				packetType = "L_RECV < ";
-				break;
-			case LogType::DLIB:
-				packetType = "DLYB > ";
-				break;
-			default:
-				break;
-		}
-
-		//std::string filePath = Utils::GetDllDirectory() + "\\dlib_log.txt";
-		std::string filePath = "C:\\Users\\joaco\\Documents\\dynamic_lib-master\\dlib_log.txt";
-
-		std::ofstream file(filePath, std::ios_base::app);
-
-		if (file.is_open()) {
-			file << packetType << packet + "\n";
-			file.close();
-		}
-	}
-
+		
 	std::string decrypt_packet(const std::string& message)
 	{
 		auto token1 = message[message.length() - 1] - 0xA;

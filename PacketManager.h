@@ -58,21 +58,13 @@ namespace PacketManager {
 	std::string build_LC(int posX, int posY);
 	std::string build_WLC(int posX, int posY, int wlct = 1);
 
-	//BSTR build_lac_packet(const int& posX, const int& posY);
-	//BSTR build_wlc_packet(const int& posX, const int& posY);
-	//BSTR build_qdl_packet(const int& pid);
 	BSTR build_console_packet(const std::string& message, ConsoleMessageType mtype = ConsoleMessageType::INFO);
-
-
-
-
 
 	std::vector<std::string> packet_split(BSTR packet, int subStrOffset = 0, int subStrCharCount = 0, char delim = ',');
 	BSTR ConvertStringToBSTR(const std::string& str);
 	std::string ConvertBSTRToString(BSTR bstr);
 	std::string ConvertWCSToMBS(const wchar_t* pstr, long wslen);
 	std::string decrypt_packet(const std::string& message);
-	void writeLog(const string& packet, LogType ltype);
 	std::vector<std::string> split(const std::string& s, char delim);
 	std::pair<std::string, int> read_SHS(const std::string& packet);
 	std::tuple<int, int> read_PU(const std::string& packet);
