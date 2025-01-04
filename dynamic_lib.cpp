@@ -8,7 +8,7 @@ namespace rm = RadarManager;
 DWORD oldTTeclas = GetTickCount();
 //DWORD ttAutoPot = GetTickCount();
 
-BOOL isRadarRunning = false;
+bool isRadarRunning = false;
 bool isKeyPressRunning = false;
 bool hideCheating = false;
 bool writeLogs = true;
@@ -17,7 +17,6 @@ bool send_tempWriteLogs = false;
 
 int cast_mode = 0;
 int cast_target = 0;
-
 
 int user_pos_x = 0;
 //std::mutex mtx_user_pos_x;
@@ -48,6 +47,10 @@ const std::string Cele = "Celeridad";
 const std::string Fue = "Fuerza";
 const std::string EleA = "Invocar elemental de agua";
 
+const std::string CMD_MEDITAR = "MEDITAR";
+
+bool cancel_medit = false;
+
 bool uk_flag = false;
 bool lh_flag = false;
 bool auto_cast_flag = false;
@@ -65,12 +68,15 @@ const int loop_caster_index = 5;
 const int min_casting_delay = 950;
 const int min_loop_caster_delay = 55;
 
+const int WAV_SCREEN_CAPTURE = 555;
+const int WAV_PRC_PPL_PPP = 324;
+
 std::unordered_map<int, Player*> players_in_map;
 //std::mutex mtx_players_in_map;
 std::unordered_map<int, PlayerRange*> players_in_range;
 
-std::unordered_map<int, Npch*> npcsh_in_map;
-std::unordered_map<int, std::pair<int, int>> npcsh_in_range;
+std::unordered_map<int, Npch*> npcs_in_map;
+std::unordered_map<int, std::pair<int, int>> npcs_in_range;
 
 std::string team_mate_name;
 
@@ -104,27 +110,24 @@ VOID WINAPI MyRecvData(BSTR dataRecv)
 	__asm PUSHAD;
 	__asm PUSHFD;
 
-	recv_tempWriteLogs = true;
+	if (StartsWith(dataRecv, L"PAIN")) {
+		PlayLocalWav(WAV_SCREEN_CAPTURE);
+		HideCheat(true);
+		PlayLocalWav(WAV_PRC_PPL_PPP);
+	}
+
+	if (StartsWith(dataRecv, { L"PRC", L"PPP", L"PPL" })) {
+		PlayLocalWav(WAV_PRC_PPL_PPP);
+	}
 
 	if (StartsWith(dataRecv, L"LH")) {
 		uk_flag = false;
 		lh_flag = false;
 		auto_cast_flag = false;
-		///selected_lh = 0;
-		recv_tempWriteLogs = false;
-	}
-
-	if (StartsWith(dataRecv, L"PAIN")) {
-		//if (isRadarRunning) {
-		//	rm::FinalizeRadar();
-		//	isRadarRunning = false;
-		//}
-		HideCheat();
 	}
 
 	if (StartsWith(dataRecv, L"MEDOK")) {
 		user_meditando = !user_meditando;
-		recv_tempWriteLogs = false;
 	}
 
 	if (StartsWith(dataRecv, L"V3")) {
@@ -136,21 +139,12 @@ VOID WINAPI MyRecvData(BSTR dataRecv)
 	//ToDo :: if (StartsWith(dataRecv, L"EST")) 
 
 	if (StartsWith(dataRecv, L"BP")) {
-		std::string packet_str = pm::ConvertBSTRToString(dataRecv).substr(2);
-
-		int id = stoi(packet_str);
-
-		RemoveMapPlayer(id);
-		RemoveRangePlayer(id);
-
-		RemoveMapNpc(id);
-		RemoveRangeNpc(id);
-		recv_tempWriteLogs = false;
+		std::string packet = pm::ConvertBSTRPacket(dataRecv, 2);
+		Intercept_BP(packet);
 	}
 
 	if (StartsWith(dataRecv, L"CM")) {
 		MapChanged();
-		recv_tempWriteLogs = false;
 	}
 
 	if (StartsWith(dataRecv, L"CC")) {
@@ -168,7 +162,6 @@ VOID WINAPI MyRecvData(BSTR dataRecv)
 	if (StartsWith(dataRecv, L"MP")) {
 		std::string packet = pm::ConvertBSTRPacket(dataRecv, 2);
 		Intercept_MP(packet);
-		//recv_tempWriteLogs = false;
 	}
 
 	if (wcsstr(dataRecv, L"P9")) {
@@ -194,8 +187,7 @@ VOID WINAPI MyRecvData(BSTR dataRecv)
 		recv_tempWriteLogs = false;
 	}
 
-	if (writeLogs) pm::writeLog(pm::ConvertBSTRToString(dataRecv), pm::DlibLogType::RECV);
-	//if (recv_tempWriteLogs) pm::writeLog(pm::ConvertBSTRToString(dataRecv), pm::DlibLogType::RECV);
+	if (writeLogs) pm::writeLog(pm::ConvertBSTRToString(dataRecv), pm::LogType::RECV);
 
 	PFunctionRecv(dataRecv);
 
@@ -269,44 +261,38 @@ VOID WINAPI MySendData(BSTR* dataSend)
 	if (StartsWith(*dataSend, L"LC")) {
 		if (cast_mode == 1) {
 			std::string packet = pm::ConvertBSTRPacket(*dataSend, 2);
-			Intercept_LH(packet);
+			Intercept_LC(packet);
 		}
 		send_tempWriteLogs = false;
 	}
 
-	if (wcsstr(*dataSend, L"M1") != NULL) {
-		//std::lock_guard<std::mutex> lock(mtx_user_pos_y);
-		user_pos_y--;
-
-		CheckNewTargets();
-		send_tempWriteLogs = false;
+	if (StartsWith(*dataSend, { L"M1",L"M2", L"M3", L"M4" })) {
+		std::string packet = pm::ConvertBSTRPacket(*dataSend, 1);
+		Intercept_M1234(packet);
 	}
 
-	if (wcsstr(*dataSend, L"M2") != NULL) {
-		//std::lock_guard<std::mutex> lock(mtx_user_pos_x);
-		user_pos_x++;
+	//if (wcsstr(*dataSend, L"M1") != NULL) {
+	//	user_pos_y--;
+	//	CheckNewTargets();
+	//	send_tempWriteLogs = false;
+	//}
+	//if (wcsstr(*dataSend, L"M2") != NULL) {
+	//	user_pos_x++;
+	//	CheckNewTargets();
+	//	send_tempWriteLogs = false;
+	//}
+	//if (wcsstr(*dataSend, L"M3") != NULL) {
+	//	user_pos_y++;
+	//	CheckNewTargets();
+	//	send_tempWriteLogs = false;
+	//}
+	//if (wcsstr(*dataSend, L"M4") != NULL) {
+	//	user_pos_x--;
+	//	CheckNewTargets();
+	//	send_tempWriteLogs = false;
+	//}
 
-		CheckNewTargets();
-		send_tempWriteLogs = false;
-	}
-
-	if (wcsstr(*dataSend, L"M3") != NULL) {		
-		//std::lock_guard<std::mutex> lock(mtx_user_pos_y);
-		user_pos_y++;
-		
-		CheckNewTargets();
-		send_tempWriteLogs = false;
-	}
-
-	if (wcsstr(*dataSend, L"M4") != NULL) {
-		//std::lock_guard<std::mutex> lock(mtx_user_pos_x);
-		user_pos_x--;
-		
-		CheckNewTargets();
-		send_tempWriteLogs = false;
-	}
-
-	if (writeLogs) pm::writeLog(pm::ConvertBSTRToString(*dataSend), pm::DlibLogType::SEND);
+	if (writeLogs) pm::writeLog(pm::ConvertBSTRToString(*dataSend), pm::LogType::SEND);
 	//if (send_tempWriteLogs) pm::writeLog(pm::ConvertBSTRToString(*dataSend), pm::DlibLogType::RECV);
 
 	PFunctionSend(dataSend);
@@ -334,14 +320,11 @@ int WINAPI MyLoop()
 				isRadarRunning = false;
 			}
 
-			Sleep(500);
+			Sleep(250);
 		}
 
 		if ((GetKeyState(VK_END) & 0x100) != 0) {
-
-			HideCheat();
-			Sleep(100);
-
+			HideCheat(true);
 		}
 
 		if ((GetKeyState(VK_XBUTTON2) & 0x100) != 0) {
@@ -373,30 +356,53 @@ int WINAPI MyLoop()
 	__asm POPAD;
 }
 
-void HideCheat() {
+void HideCheat(bool finalizeRadar) {
 	hideCheating = true;
-	for (const auto& pl : players_in_map) {
-		if (!pl.second) continue;
 
-		if (pl.second->inviDetected) {
+	if (isRadarRunning) {
+		rm::FinalizeRadar();
+		isRadarRunning = false;
+	}
 
-			pl.second->name = pl.second->orgName;
-			pl.second->isInvisible = true;
-			pl.second->inviDetected = false;
+	Sleep(25);
 
-			SendToClient(pm::build_bp_packet(pl.first));
-			SendToClient(pm::build_cc_packet(pl));
+	for (const auto& player : players_in_map) {
+		if (!player.second) continue;
+
+		auto& pl = player.second;
+
+		if (pl->inviDetected) {
+
+			pl->name = pl->orgName;
+			pl->isInvisible = true;
+			pl->inviDetected = false;
+
+			SendToClient(pm::build_BP(pl->id));
+			SendToClient(pm::build_CC(player));
 		}
 	}
+	//for (const auto& pl : players_in_map) {
+	//	if (!pl.second) continue;
+	//	if (pl.second->inviDetected) {
+	//		pl.second->name = pl.second->orgName;
+	//		pl.second->isInvisible = true;
+	//		pl.second->inviDetected = false;
+	//		SendToClient(pm::build_BP(pl.first));
+	//		SendToClient(pm::build_cc_packet(pl));
+	//		//SendToClient(pm::build_bp_packet(pl.first));
+	//		//SendToClient(pm::build_cc_packet(pl));
+	//	}
+	//}
+	Sleep(25);
 }
 
 void MapChanged() {
 
-	CleanupMapNpcs();
-	CleanupRangeNpcs();
+	CleanupMap(players_in_map);
+	CleanupMap(players_in_range);
 
-	CleanupMapPlayers();
-	CleanupRangePlayers();
+	CleanupMap(npcs_in_map);
+	CleanupRangeNpcs();
 
 	selected_npch_id = 0;
 	selected_player_id = 0;
@@ -433,34 +439,33 @@ void Intercept_CR(const std::string& packet) {
 
 void AddNpch(int nid, int posX, int posY) {
 
-	auto itn = npcsh_in_map.find(nid);
+	auto itn = npcs_in_map.find(nid);
 
-	if (itn == npcsh_in_map.end()) {
+	if (itn == npcs_in_map.end()) {
 
 		Npch* npc = new Npch();
 		npc->id = nid;
 		npc->posX = posX;
 		npc->posY = posY;
 
-		npcsh_in_map.emplace(nid, npc);
-		//pm::writeLog("AddNpch map.emplaced npc. Map count " + std::to_string(npcsh_in_map.size()), pm::DlibLogType::DLIB);
+		npcs_in_map.emplace(nid, npc);
 
 		if (IsInRange(posX, posY)) {
-			npcsh_in_range.emplace(nid, std::make_pair(posX, posY));
-			//pm::writeLog("AddNpch range.emplaced npc. Map count " + std::to_string(npcsh_in_range.size()), pm::DlibLogType::DLIB);
+			npcs_in_range.emplace(nid, std::make_pair(posX, posY));
 		}
 	}
 }
 
 void RemoveMapNpc(int nid) {
-	auto itn = npcsh_in_map.find(nid);
+	auto itn = npcs_in_map.find(nid);
 
-	if (itn != npcsh_in_map.end()) {
+	if (itn != npcs_in_map.end()) {
 		if (itn->second) {
 			delete itn->second;
 			itn->second = nullptr;
 		}
-		npcsh_in_map.erase(itn);
+		npcs_in_map.erase(itn);
+		RemoveRangeNpc(nid);
 	}
 }
 
@@ -502,7 +507,7 @@ void AddPlayer(int pid, const std::vector<std::string>& pinfo) {
 	}
 }
 
-void RemoveMapPlayer(int pid) {
+bool RemoveMapPlayer(int pid) {
 	auto itp = players_in_map.find(pid);
 
 	if (itp != players_in_map.end()) {
@@ -513,7 +518,12 @@ void RemoveMapPlayer(int pid) {
 		}
 
 		players_in_map.erase(itp);
+		RemoveRangePlayer(pid);
+
+		return true;
 	}
+
+	return false;
 }
 
 void Intercept_MP(const std::string& packet) {
@@ -534,22 +544,34 @@ void Intercept_MP(const std::string& packet) {
 
 void UpdateNpcPos(int nid, int posX, int posY, bool inRange) {
 
-	auto itr = npcsh_in_range.find(nid);
+	auto itm = npcs_in_map.find(nid);
+	auto itr = npcs_in_range.find(nid);
 
-	if (itr != npcsh_in_range.end()) {
+	if (itm != npcs_in_map.end() && itm->second) {
+		itm->second->posX = posX;
+		itm->second->posY = posY;
+	}
+
+	if (itr != npcs_in_range.end()) {
 		if (inRange)
 			itr->second = std::make_pair(posX, posY);
 		else
-			npcsh_in_range.erase(nid);
+			npcs_in_range.erase(itr);
 	}
 	else if (inRange) {
-		npcsh_in_range.emplace(nid, std::make_pair(posX, posY));
+		npcs_in_range.emplace(nid, std::make_pair(posX, posY));
 	}
 }
 
 void UpdatePlayerPos(int pid, int posX, int posY, bool inRange) {
 
+	auto itp = players_in_map.find(pid);
 	auto itr = players_in_range.find(pid);
+
+	if (itp != players_in_map.end() && itp->second) {
+		itp->second->posX = posX;
+		itp->second->posY = posY;
+	}
 
 	if (itr != players_in_range.end()) {
 		if (inRange) {
@@ -575,7 +597,8 @@ void AddPlayerRange(int pid, int posX, int posY) {
 	players_in_range.emplace(pid, pr);
 }
 
-void RemoveRangePlayer(std::unordered_map<int, PlayerRange*>::iterator it) {
+void RemoveRangePlayer(std::unordered_map<int, PlayerRange*>::iterator& it) {
+
 	if (it->second) {
 		delete it->second;
 		it->second = nullptr;
@@ -588,54 +611,33 @@ void RemoveRangePlayer(int pid) {
 	auto itr = players_in_range.find(pid);
 
 	if (itr != players_in_range.end()) {
+
 		if (itr->second) {
 			delete itr->second;
 			itr->second = nullptr;
 		}
-
 		players_in_range.erase(itr);
 	}
 }
 
 void RemoveRangeNpc(int nid) {
-	npcsh_in_range.erase(nid);
+	npcs_in_range.erase(nid);
 }
 
-void CleanupMapPlayers() {
-	for (auto& player : players_in_map) {
-		if (!player.second) continue;
+template <typename MapType>
+void CleanupMap(MapType& map) {
 
-		delete player.second;
-		player.second = nullptr;
+	for (auto& element : map) {
+		if (!element.second) continue;
+		delete element.second;
+		element.second = nullptr;
 	}
 
-	players_in_map.clear();
-}
-
-void CleanupRangePlayers() {
-	for (auto& player : players_in_range) {
-		if (!player.second) continue;
-
-		delete player.second;
-		player.second = nullptr;
-	}
-
-	players_in_range.clear();
-}
-
-void CleanupMapNpcs() {
-	for (auto& npc : npcsh_in_map) {
-		if (!npc.second) continue;
-
-		delete npc.second;
-		npc.second = nullptr;
-	}
-
-	npcsh_in_map.clear();
+	map.clear();
 }
 
 void CleanupRangeNpcs() {
-	npcsh_in_range.clear();
+	npcs_in_range.clear();
 }
 
 void Intercept_PU(const std::string& packet) {
@@ -644,7 +646,7 @@ void Intercept_PU(const std::string& packet) {
 	user_pos_y = std::get<1>(xy);
 }
 
-void Intercept_LH(const std::string& packet) {
+void Intercept_LC(const std::string& packet) {
 	auto pinfo = pm::split(packet, ',');
 
 	int posX = stoi(pinfo[0]);
@@ -664,7 +666,7 @@ void SetManualTarget(int posX, int posY) {
 		}
 	}
 
-	for (const auto& nr : npcsh_in_range) {
+	for (const auto& nr : npcs_in_range) {
 		if (nr.second.first == posX && nr.second.second == posY) {
 			selected_npch_id = nr.first;
 			break;
@@ -673,6 +675,8 @@ void SetManualTarget(int posX, int posY) {
 }
 
 void Intercept_V3(BSTR& dataRecv, const std::string& packet) {
+	if (hideCheating) return;
+
 	std::string dcpt_packet = pm::decrypt_packet(packet);
 	auto pinfo = pm::split(dcpt_packet, ',');
 
@@ -682,28 +686,102 @@ void Intercept_V3(BSTR& dataRecv, const std::string& packet) {
 
 	auto itp = players_in_map.find(pid);
 
-	if (itp != players_in_map.end()) {
-		itp->second->isInvisible = stoi(pinfo[4]) == 1;
+	if (itp != players_in_map.end() && itp->second) {
+		auto& pl = itp->second;
+		bool invi = pinfo[4] == "1";
+		pl->isInvisible = invi;
 
-		if (!hideCheating && itp->second->isInvisible) {
-			itp->second->name += " [I]";
-			itp->second->isInvisible = false;
-			itp->second->inviDetected = true;
+		if (invi) {
+
+			pl->name += " [I]";
+			pl->isInvisible = false;
+			pl->inviDetected = true;
 
 			SendToClient(pm::build_BP(pid));
-			SendToClient(pm::build_CC(itp));
+			SendToClient(pm::build_CC(*pl));
 
+			pinfo[4] = "0";
 			SysFreeString(dataRecv);
 			dataRecv = pm::ConvertStringToBSTR(pm::build_V3(pinfo));
 		}
 		else {
-			itp->second->name = itp->second->orgName;
-			itp->second->inviDetected = false;
+			pl->name = pl->orgName;
+			pl->inviDetected = false;
 
 			SendToClient(pm::build_BP(pid));
-			SendToClient(pm::build_CC(itp));
+			SendToClient(pm::build_CC(*pl));
 		}
 	}
+}
+
+//void Intercept_V3(BSTR& dataRecv, const std::string& packet) {
+//	std::string dcpt_packet = pm::decrypt_packet(packet);
+//	auto pinfo = pm::split(dcpt_packet, ',');
+//
+//	int pid = stoi(pinfo[1]);
+//
+//	if (pid == user_id) return;
+//
+//	auto itp = players_in_map.find(pid);
+//
+//	if (itp != players_in_map.end()) {			
+//		itp->second->isInvisible = stoi(pinfo[4]) == 1;
+//
+//		if (!hideCheating && itp->second->isInvisible) {
+//			itp->second->name += " [I]";
+//			itp->second->isInvisible = false;
+//			itp->second->inviDetected = true;
+//
+//			SendToClient(pm::build_BP(pid));
+//			SendToClient(pm::build_CC(itp));
+//
+//			SysFreeString(dataRecv);
+//			dataRecv = pm::ConvertStringToBSTR(pm::build_V3(pinfo));
+//		}
+//		else {
+//			itp->second->name = itp->second->orgName;
+//			itp->second->inviDetected = false;
+//
+//			SendToClient(pm::build_BP(pid));
+//			SendToClient(pm::build_CC(itp));
+//		}
+//	}
+//}
+
+void Intercept_M1234(const std::string& packet) {
+
+	if (user_paralized || (!cancel_medit && user_meditando)) return;
+
+	if (cancel_medit && user_meditando) {
+		SendToServer(pm::build_CMD(CMD_MEDITAR));
+	}
+
+	int dir = stoi(packet);
+	switch (dir)
+	{
+		case 1:
+			user_pos_y--;
+			break;
+		case 2:
+			user_pos_x++;
+			break;
+		case 3:
+			user_pos_y++;
+			break;
+		case 4:
+			user_pos_x--;
+			break;
+		default:
+			break;
+	}
+
+	CheckNewTargets();
+}
+
+void Intercept_BP(const std::string& packet) {
+	int eid = stoi(packet);
+	if (RemoveMapPlayer(eid)) return;
+	RemoveMapNpc(eid);
 }
 
 bool IsInRange(int posX, int posY) {
@@ -752,7 +830,7 @@ std::tuple<int, int> GetClosestTargetPos(int posX, int posY) {
 	if (closestX > -1 && closestY > -1)
 		return { closestX, closestY };
 
-	for (const auto& nr : npcsh_in_range) {
+	for (const auto& nr : npcs_in_range) {
 		updateClosest(nr.second.first, nr.second.second);
 	}
 
@@ -763,6 +841,7 @@ std::tuple<int, int> GetClosestTargetPos(int posX, int posY) {
 	return { closestX, closestY };
 }
 
+//Todo review cheknewtarg
 void CheckNewTargets() {
 	// Process players in the map
 	for (const auto& pm : players_in_map) {
@@ -789,15 +868,15 @@ void CheckNewTargets() {
 	}
 
 	// Process NPCs in the map
-	for (const auto& nm : npcsh_in_map) {
+	for (const auto& nm : npcs_in_map) {
 		int npcId = nm.second->id;
-		auto itn = npcsh_in_range.find(npcId);
+		auto itn = npcs_in_range.find(npcId);
 		bool inRange = IsInRange(nm.second->posX, nm.second->posY);
 
 		if (inRange) {
-			if (itn == npcsh_in_range.end()) {
+			if (itn == npcs_in_range.end()) {
 				// Add NPC to the range if not already present
-				npcsh_in_range.emplace(npcId, std::make_pair(nm.second->posX, nm.second->posY));
+				npcs_in_range.emplace(npcId, std::make_pair(nm.second->posX, nm.second->posY));
 			}
 		}
 		//else if (itn != npcsh_in_range.end()) {
@@ -805,6 +884,11 @@ void CheckNewTargets() {
 		//	RemoveRangeNpc(npcId);
 		//}
 	}
+}
+
+void PlayLocalWav(int wav) {
+	std::string packet = pm::build_TW(wav, user_pos_x, user_pos_y);
+	SendToClient(packet);
 }
 
 /*
@@ -853,7 +937,7 @@ VOID SendToClient(const std::string& message)
 		//
 		//writelrFile(recvPacket);
 
-		if (writeLogs) pm::writeLog(message, pm::DlibLogType::LOCAL_RECV);
+		if (writeLogs) pm::writeLog(message, pm::LogType::LOCAL_RECV);
 
 		PFunctionRecv(recvPacket);
 		//
@@ -879,7 +963,7 @@ VOID SendToClient(BSTR recvPacket)
 		//
 		//writelrFile(recvPacket);
 
-		if (writeLogs) pm::writeLog(pm::ConvertBSTRToString(recvPacket), pm::DlibLogType::LOCAL_RECV);
+		if (writeLogs) pm::writeLog(pm::ConvertBSTRToString(recvPacket), pm::LogType::LOCAL_RECV);
 
 		PFunctionRecv(recvPacket);
 		//
@@ -896,7 +980,7 @@ VOID SendToServer(const std::string& message)
 {
 	try
 	{
-		if (writeLogs) pm::writeLog(message, pm::DlibLogType::LOCAL_SEND);
+		if (writeLogs) pm::writeLog(message, pm::LogType::LOCAL_SEND);
 
 		//
 		//// Create Packet
@@ -951,6 +1035,24 @@ BOOL StartsWith(BSTR sValue, const WCHAR* pszSubValue) {
 	}
 
 	return wcsncmp(sValue, pszSubValue, subValueLen) == 0;
+}
+
+BOOL StartsWith(BSTR sValue, const std::vector<const WCHAR*>& pszSubValue) {
+
+	if (!sValue) return FALSE;
+
+	for (const auto& subValue : pszSubValue) {
+
+		if (!subValue) return FALSE;
+
+		size_t subValueLen = wcslen(subValue);
+		if (SysStringLen(sValue) < subValueLen) return FALSE;
+
+		if (wcsncmp(sValue, subValue, subValueLen) == 0)
+			return TRUE;
+	}
+
+	return FALSE;
 }
 
 BOOL StartsWithAndNot(BSTR sValue, const WCHAR* pszSubValue, const WCHAR* npszSubValue) {

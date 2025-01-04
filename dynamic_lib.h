@@ -9,6 +9,7 @@
 #include <vector>
 #include <map>
 #include <unordered_map>
+#include <unordered_set>
 #include <iterator>
 #include <memory>
 #include <tuple>
@@ -44,11 +45,12 @@ VOID WINAPI MySendData(BSTR* sendData);
 int WINAPI MyLoop();
 
 BOOL StartsWith(BSTR sValue, const WCHAR* pszSubValue);
+BOOL StartsWith(BSTR sValue, const std::vector<const WCHAR*>& pszSubValue);
 BOOL StartsWithAndNot(BSTR sValue, const WCHAR* pszSubValue, const WCHAR* npszSubValue);
 
 std::string hexToString(const std::string& hex);
 
-void HideCheat();
+void HideCheat(bool finalizeRadar);
 void MapChanged();
 //VOID AutoRegenHpMan();
 
@@ -62,30 +64,32 @@ void RemoveMapNpc(int nid);
 
 void Intercept_CC(BSTR& dataRecv, const std::string& packet);
 void AddPlayer(int pid, const std::vector<std::string>& pinfo);
-void RemoveMapPlayer(int pid);
+bool RemoveMapPlayer(int pid);
 
 void Intercept_MP(const std::string& packet);
 void UpdateNpcPos(int nid, int posX, int posY, bool inRange);
 void UpdatePlayerPos(int pid, int posX, int posY, bool inRange);
 
 void AddPlayerRange(int pid, int posX, int posY);
-void RemoveRangePlayer(std::unordered_map<int, PlayerRange*>::iterator it);
+void RemoveRangePlayer(std::unordered_map<int, PlayerRange*>::iterator& it);
 void RemoveRangePlayer(int pid);
 
 void RemoveRangeNpc(int nid);
 
-void CleanupMapPlayers();
-void CleanupRangePlayers();
-
-void CleanupMapNpcs();
+template <typename MapType>
+void CleanupMap(MapType& map);
 void CleanupRangeNpcs();
 
 void Intercept_PU(const std::string& packet);
 
-void Intercept_LH(const std::string& packet);
+void Intercept_LC(const std::string& packet);
 void SetManualTarget(int posX, int posY);
 
 void Intercept_V3(BSTR& dataRecv, const string& packet);
+
+void Intercept_M1234(const std::string& packet);
+
+void Intercept_BP(const std::string& packet);
 
 bool IsInRange(int posX, int posY);
 
@@ -94,6 +98,8 @@ std::tuple<int, int> GetManualTargetPos();
 std::tuple<int, int> GetUserTargetPos();
 
 void CheckNewTargets();
+
+void PlayLocalWav(int wav);
 
 VOID SendToClient(const std::string& message);
 VOID SendToClient(BSTR message);

@@ -4,29 +4,27 @@
 
 namespace PacketManager {
 
-	BSTR build_cc_packet(const std::pair<const int, Player*>& pair) {
-
+	std::string build_CC(const Player& player) {
 		std::ostringstream packetStream;
 		packetStream << "CC"
-			<< pair.second->inf0 << ","
-			<< pair.second->inf1 << ","
-			<< pair.second->inf2 << ","
-			<< pair.second->id << ","
-			<< pair.second->posX << ","
-			<< pair.second->posY << ","
-			<< pair.second->inf6 << ","
-			<< pair.second->inf7 << ","
-			<< pair.second->inf8 << ","
-			<< pair.second->inf9 << ","
-			<< pair.second->inf10 << ","
-			<< pair.second->name << ","
-			<< pair.second->faction << ","
-			<< pair.second->isInvisible << ","
-			<< pair.second->inf14 << ","
-			<< pair.second->inf15;
+			<< player.inf0 << ","
+			<< player.inf1 << ","
+			<< player.inf2 << ","
+			<< player.id << ","
+			<< player.posX << ","
+			<< player.posY << ","
+			<< player.inf6 << ","
+			<< player.inf7 << ","
+			<< player.inf8 << ","
+			<< player.inf9 << ","
+			<< player.inf10 << ","
+			<< player.name << ","
+			<< player.faction << ","
+			<< player.isInvisible << ","
+			<< player.inf14 << ","
+			<< player.inf15;
 
-		return ConvertStringToBSTR(packetStream.str());
-
+		return packetStream.str();
 	}
 	std::string build_CC(const std::pair<const int, Player*>& pair) {
 		std::ostringstream packetStream;
@@ -50,64 +48,6 @@ namespace PacketManager {
 
 		return packetStream.str();
 	}
-
-	BSTR build_cc_packet(std::unordered_map<int, Player*>::iterator player) {
-		std::ostringstream packetStream;
-		packetStream << "CC"
-			<< player->second->inf0 << ","
-			<< player->second->inf1 << ","
-			<< player->second->inf2 << ","
-			<< player->second->id << ","
-			<< player->second->posX << ","
-			<< player->second->posY << ","
-			<< player->second->inf6 << ","
-			<< player->second->inf7 << ","
-			<< player->second->inf8 << ","
-			<< player->second->inf9 << ","
-			<< player->second->inf10 << ","
-			<< player->second->name << ","
-			<< player->second->faction << ","
-			<< player->second->isInvisible << ","
-			<< player->second->inf14 << ","
-			<< player->second->inf15;
-
-		return ConvertStringToBSTR(packetStream.str());
-	}
-	std::string build_CC(std::unordered_map<int, Player*>::iterator player) {
-		std::ostringstream packetStream;
-		packetStream << "CC"
-			<< player->second->inf0 << ","
-			<< player->second->inf1 << ","
-			<< player->second->inf2 << ","
-			<< player->second->id << ","
-			<< player->second->posX << ","
-			<< player->second->posY << ","
-			<< player->second->inf6 << ","
-			<< player->second->inf7 << ","
-			<< player->second->inf8 << ","
-			<< player->second->inf9 << ","
-			<< player->second->inf10 << ","
-			<< player->second->name << ","
-			<< player->second->faction << ","
-			<< player->second->isInvisible << ","
-			<< player->second->inf14 << ","
-			<< player->second->inf15;
-
-		return packetStream.str();
-	}
-
-	BSTR build_cc_packet(const std::vector<std::string>& player_info) {
-		std::ostringstream packet;
-		packet << "CC";
-
-		for (size_t i = 0; i < player_info.size(); ++i) {
-			if (i > 0) packet << ",";  // Add comma separator
-			packet << player_info[i];
-		}
-
-		// Convert to BSTR and return
-		return ConvertStringToBSTR(packet.str());
-	}
 	std::string build_CC(const std::vector<std::string>& player_info) {
 		std::ostringstream packet;
 		packet << "CC";
@@ -120,25 +60,14 @@ namespace PacketManager {
 		return packet.str();
 	}
 
-
-	BSTR build_v3_packet(const std::vector<std::string>& packet_data) {
-
-		std::ostringstream packetStream;
-		packetStream << "V3"
-			<< packet_data[0] << ","
-			<< packet_data[1] << ","
-			<< packet_data[2] << ","
-			<< packet_data[3] << ",0";
-
-		return ConvertStringToBSTR(packetStream.str());
-	}
 	std::string build_V3(const std::vector<std::string>& packet_data) {
 		std::ostringstream packetStream;
 		packetStream << "V3"
 			<< packet_data[0] << ","
 			<< packet_data[1] << ","
 			<< packet_data[2] << ","
-			<< packet_data[3] << ",0";
+			<< packet_data[3] << ","
+			<< packet_data[4];
 
 		return packetStream.str();
 	}
@@ -195,6 +124,18 @@ namespace PacketManager {
 		return ConvertStringToBSTR(packet.str());
 	}
 
+	std::string build_TW(int wav, int posX, int posY) {
+		std::ostringstream packet;
+		packet << "TW" << wav << "," << posX << "," << posY;
+		return packet.str();
+	}
+
+	std::string build_CMD(const std::string& command) {
+		std::ostringstream packet;
+		packet << "/" << command;
+		return packet.str();
+	}
+
 	string ConvertWCSToMBS(const wchar_t* pstr, long wslen)
 	{
 		int len = ::WideCharToMultiByte(CP_ACP, 0, pstr, wslen, NULL, 0, NULL, NULL);
@@ -237,25 +178,25 @@ namespace PacketManager {
 		return split(packet_str, delim);
 	}
 
-	void writeLog(const string& packet, DlibLogType ltype) {
+	void writeLog(const string& packet, LogType ltype) {
 
 		std::string packetType;
 
 		switch (ltype)
 		{
-			case DlibLogType::SEND:
+			case LogType::SEND:
 				packetType = "SEND > ";
 				break;
-			case DlibLogType::RECV:
+			case LogType::RECV:
 				packetType = "RECV < ";
 				break;
-			case DlibLogType::LOCAL_SEND:
+			case LogType::LOCAL_SEND:
 				packetType = "L_SEND > ";
 				break;
-			case DlibLogType::LOCAL_RECV:
+			case LogType::LOCAL_RECV:
 				packetType = "L_RECV < ";
 				break;
-			case DlibLogType::DLIB:
+			case LogType::DLIB:
 				packetType = "DLYB > ";
 				break;
 			default:
@@ -288,16 +229,6 @@ namespace PacketManager {
 
 		return decryptedPacket;
 	}
-
-	//std::vector<std::string> split(const std::string& s, char delim) {
-	//	std::vector<std::string> elems;
-	//	std::stringstream ss(s);
-	//	std::string item;
-	//	while (std::getline(ss, item, delim)) {
-	//		elems.push_back(std::move(item));
-	//	}
-	//	return elems;
-	//}
 
 	std::vector<std::string> split(const std::string& s, char delim) {
 		std::vector<std::string> elems;

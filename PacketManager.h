@@ -15,7 +15,7 @@ namespace PacketManager {
 		INFO
 	};
 
-	enum class DlibLogType {
+	enum class LogType {
 		SEND,
 		RECV,
 		LOCAL_SEND,
@@ -23,20 +23,21 @@ namespace PacketManager {
 		DLIB
 	};
 
-	BSTR build_cc_packet(const std::pair<const int, Player*>& pair);
+	std::string build_CC(const Player& player);
+	
 	std::string build_CC(const std::pair<const int, Player*>& pair);
-
-	BSTR build_cc_packet(std::unordered_map<int, Player*>::iterator player);
-	std::string build_CC(std::unordered_map<int, Player*>::iterator player);
-
-	BSTR build_cc_packet(const std::vector<std::string>& player_info);
+	
 	std::string build_CC(const std::vector<std::string>& player_info);
 
-	BSTR build_v3_packet(const std::vector<std::string>& packet_data);
 	std::string build_V3(const std::vector<std::string>& packet_data);
 
-	BSTR build_bp_packet(const int& pid);
 	std::string build_BP(int pid);
+
+	std::string build_TW(int wav, int posX, int posY);
+	
+	std::string build_CMD(const std::string& command);
+
+	std::string build_LC();
 
 	BSTR build_lac_packet(const int& posX, const int& posY);
 	BSTR build_wlc_packet(const int& posX, const int& posY);
@@ -47,7 +48,7 @@ namespace PacketManager {
 	std::string ConvertBSTRToString(BSTR bstr);
 	std::string ConvertWCSToMBS(const wchar_t* pstr, long wslen);
 	std::string decrypt_packet(const std::string& message);
-	void writeLog(const string& packet, DlibLogType ltype);
+	void writeLog(const string& packet, LogType ltype);
 	std::vector<std::string> split(const std::string& s, char delim);
 	std::pair<std::string, int> read_SHS(const std::string& packet);
 	std::tuple<int, int> read_PU(const std::string& packet);

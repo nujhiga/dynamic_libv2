@@ -16,6 +16,10 @@ namespace RadarManager {
 	void InitBrushes();
 	void ReleaseBrushes();
 	void DisposeObjects();
-	void RadarRenderThread();
+	void RadarRender();
+	void RenderPos(const HFONT& font);
+	void RenderUser();
+	void RenderPlayers();
+	RECT GetRectRadar(int left, int top, int right, int bottom, float scale = 1.0f);
 }
 
