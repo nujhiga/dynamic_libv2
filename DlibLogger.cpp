@@ -1,5 +1,5 @@
-#include "stdafx.h"
 #include "DlibLogger.h"
+#include "stdafx.h"
 #include <iostream>
 
 //public
@@ -50,7 +50,6 @@ const std::array<const char*, static_cast<int>(DlibLogger::LogType::COUNT)> Dlib
 
 std::string DlibLogger::LogTypeStr(const DlibLogger::LogType& ltype) {
 	int idx = static_cast<int>(ltype);
-
 	return (idx >= 0 && idx < static_cast<int>(DlibLogger::LogType::COUNT)) ?
 		DlibLogger::LogTypes[idx] : "Unknown";
 }

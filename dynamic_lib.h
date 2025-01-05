@@ -28,16 +28,11 @@
 #include "DlibLogger.h"
 #include "mutex"
 
-//ToDo move to globals file
 extern std::unordered_map<int, Player*> players_in_map;
-//extern std::mutex mtx_players_in_map;
-
 extern int user_pos_x;
-//extern std::mutex mtx_user_pos_x;
-
 extern int user_pos_y;
-//extern std::mutex mtx_user_pos_y;
-//ToDo move to globals file
+
+extern DlibLogger dlg;
 
 void InitializeHooks(void);
 
@@ -69,7 +64,8 @@ bool RemoveMapPlayer(int pid);
 
 void Intercept_MP(const std::string& packet);
 void UpdateNpcPos(int nid, int posX, int posY, bool inRange);
-void UpdatePlayerPos(int pid, int posX, int posY, bool inRange);
+//void UpdatePlayerPos(int pid, int posX, int posY, bool inRange);
+bool UpdatePlayerPos(int pid, int posX, int posY, bool inRange);
 
 void AddPlayerRange(int pid, int posX, int posY);
 void RemoveRangePlayer(std::unordered_map<int, PlayerRange*>::iterator& it);
@@ -96,11 +92,16 @@ void Intercept_WLC(BSTR* dataSend, const std::string packet);
 
 bool IsInRange(int posX, int posY);
 
+bool IsUserPosOutbounds();
+
+void SetUserpos(int posX, int posY);
+
 std::tuple<int, int> GetClosestTargetPos(int posX, int posY);
 std::tuple<int, int> GetManualTargetPos();
 std::tuple<int, int> GetUserTargetPos();
 
-void CheckNewTargets();
+void CheckPlayerTargets();
+void CheckNpcTargets();
 
 void PlayLocalWav(int wav);
 

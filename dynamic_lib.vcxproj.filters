@@ -63,6 +63,9 @@
     <ClInclude Include="DlibLogger.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -106,5 +109,8 @@
     <Library Include="detours.lib">
       <Filter>Resource Files</Filter>
     </Library>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="DlibLogger.tpp" />
   </ItemGroup>
 </Project>

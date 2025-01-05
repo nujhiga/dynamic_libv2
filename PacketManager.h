@@ -17,14 +17,6 @@ namespace PacketManager {
 		INFO
 	};
 
-	enum class LogType {
-		SEND,
-		RECV,
-		LOCAL_SEND,
-		LOCAL_RECV,
-		DLIB
-	};
-
 	enum class OPCode {
 		CC,
 		V3,

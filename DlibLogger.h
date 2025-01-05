@@ -30,7 +30,16 @@ public:
 
 	void logData(const std::string& data, const LogType& ltype);
 
+	template<typename... Args>
+	void logDebug(const std::string& methodName, Args&&... args);
+
 private:
+
+	template<typename T>
+	void formatArgs(std::ostringstream& oss, const std::string& varName, const T& value);
+
+	template<typename T, typename... Args>
+	void formatArgs(std::ostringstream& oss, const std::string& varName, const T& value, Args&&... args);
 
 	static const std::array<const char*, static_cast<int>(LogType::COUNT)> LogTypes;
 	static std::string LogTypeStr(const LogType& ltype);
@@ -45,3 +54,5 @@ private:
 
 	void processLogs();
 };
+
+#include "DlibLogger.tpp"

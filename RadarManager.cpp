@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "RadarManager.h"
 
+
 namespace RadarManager {
 
 	std::atomic<bool> runRadar{ false };
@@ -41,8 +42,8 @@ namespace RadarManager {
 		if (!SetupRadar(windowTitle)) return false;
 
 		InitBrushes();
-		radarHandle = CreateThread(0, 0, (LPTHREAD_START_ROUTINE)RadarRender, 0, 0, 0);
 		runRadar.store(true);
+		radarHandle = CreateThread(0, 0, (LPTHREAD_START_ROUTINE)RadarRender, 0, 0, 0);
 
 		return true;
 	}
@@ -65,19 +66,19 @@ namespace RadarManager {
 		hWnd = FindWindow(NULL, wndTitle.c_str());
 
 		if (hWnd == NULL) {
-		//	pm::writeLog("RadarManager - Failed to find window: " + windowTitle, pm::LogType::DLIB);
+			dlg.logData("RadarManager - Failed to find window: " + windowTitle, DlibLogger::LogType::DLIB);
 			return false;
 		}
 
 		hdcWindow = GetDC(hWnd);
 		if (hdcWindow == NULL) {
-			//pm::writeLog("RadarManager - Failed to get DC", pm::LogType::DLIB);
+			dlg.logData("RadarManager - Failed to get DC", DlibLogger::LogType::DLIB);
 			return false;
 		}
 
 		hdcCompatible = CreateCompatibleDC(hdcWindow);
 		if (hdcCompatible == NULL) {
-		//	pm::writeLog("RadarManager - Failed to create compatible HDC", pm::LogType::DLIB);
+			dlg.logData("RadarManager - Failed to create compatible HDC", DlibLogger::LogType::DLIB);
 			ReleaseDC(hWnd, hdcWindow);
 			return false;
 		}
@@ -157,7 +158,7 @@ namespace RadarManager {
 
 			RenderPlayers();
 			
-			Sleep(125);
+			Sleep(90);
 		}
 
 		DeleteObject(hFont);
