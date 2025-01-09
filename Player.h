@@ -1,39 +1,38 @@
 #pragma once
+#include "Entity.h"
 
-#include <string>
-
-using std::string;
-
-class Player
-{
+class Player : public Entity {
 public:
-	Player();
-	Player(const std::vector<std::string>& pinfo);
-	~Player();
+	Player(const std::vector<std::string>& data, int inviDetected);
+	
+	int wanim;
+	int sanim;
+	int fx;
+	int canim;
+	std::string name;
+	int bcr;
+	int invi;
+	int inviDetected;
 
-	int inf0;
-	int inf1;
-	int inf2;
+	const int unk1 = 999;
+	const int unk2 = 0;
+	const int unk3 = 10;
 
-	int id; //inf3
-	int posX; //inf4
-	int posY; //inf5
-
-	int inf6;
-	int inf7;
-	int inf8;
-	int inf9;
-	int inf10;
-
-	string name; //inf11
-	int faction; //inf12
-	bool isInvisible; //inf13
-	bool inviDetected;
-
-	int inf14;
-	int inf15;
-
-	string orgName;
 };
 
-//CC206,303,2,4440,27,80,2,6,0,999,38,talalp,3,0,0,10
+//0.body-
+// 1.head-
+// 2.heading-
+// 3.id-
+// 4.x-
+// 5.y-
+// 6.wanim-
+// 7.sanim-
+// 8.fx-
+// 9.999-
+// 10.canim-
+// 11.name-
+// 12.bcr-
+// 13.invi-
+// 14.unk1-
+// 15.unk2

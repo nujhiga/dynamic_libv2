@@ -23,50 +23,29 @@ namespace PacketManager {
 		return packet.str();
 	}
 
-	std::string build_CC(const Player& player) {
+	std::string build_CC(const std::shared_ptr<Player>& player) {
 		std::ostringstream packetStream;
 		packetStream << "CC"
-			<< player.inf0 << ","
-			<< player.inf1 << ","
-			<< player.inf2 << ","
-			<< player.id << ","
-			<< player.posX << ","
-			<< player.posY << ","
-			<< player.inf6 << ","
-			<< player.inf7 << ","
-			<< player.inf8 << ","
-			<< player.inf9 << ","
-			<< player.inf10 << ","
-			<< player.name << ","
-			<< player.faction << ","
-			<< player.isInvisible << ","
-			<< player.inf14 << ","
-			<< player.inf15;
+			<< player->body << ","
+			<< player->head << ","
+			<< player->heading << ","
+			<< player->id << ","
+			<< player->posX << ","
+			<< player->posY << ","
+			<< player->wanim << ","
+			<< player->sanim << ","
+			<< player->fx << ","
+			<< player->unk1 << ","
+			<< player->canim << ","
+			<< player->name << ","
+			<< player->bcr << ","
+			<< player->invi << ","
+			<< player->unk2 << ","
+			<< player->unk3;
 
 		return packetStream.str();
 	}
-	std::string build_CC(const std::pair<const int, Player*>& pair) {
-		std::ostringstream packetStream;
-		packetStream << "CC"
-			<< pair.second->inf0 << ","
-			<< pair.second->inf1 << ","
-			<< pair.second->inf2 << ","
-			<< pair.second->id << ","
-			<< pair.second->posX << ","
-			<< pair.second->posY << ","
-			<< pair.second->inf6 << ","
-			<< pair.second->inf7 << ","
-			<< pair.second->inf8 << ","
-			<< pair.second->inf9 << ","
-			<< pair.second->inf10 << ","
-			<< pair.second->name << ","
-			<< pair.second->faction << ","
-			<< pair.second->isInvisible << ","
-			<< pair.second->inf14 << ","
-			<< pair.second->inf15;
 
-		return packetStream.str();
-	}
 	std::string build_CC(const std::vector<std::string>& player_info) {
 		std::ostringstream packet;
 		packet << "CC";
@@ -143,7 +122,7 @@ namespace PacketManager {
 		return packet.str();
 	}
 
-	string ConvertWCSToMBS(const wchar_t* pstr, long wslen)
+	std::string ConvertWCSToMBS(const wchar_t* pstr, long wslen)
 	{
 		int len = ::WideCharToMultiByte(CP_ACP, 0, pstr, wslen, NULL, 0, NULL, NULL);
 
@@ -153,7 +132,7 @@ namespace PacketManager {
 		return dblstr;
 	}
 
-	string ConvertBSTRToString(BSTR bstr)
+	std::string ConvertBSTRToString(BSTR bstr)
 	{
 		int wslen = ::SysStringLen(bstr);
 		return ConvertWCSToMBS(bstr, wslen);
@@ -184,7 +163,7 @@ namespace PacketManager {
 
 		return split(packet_str, delim);
 	}
-		
+
 	std::string decrypt_packet(const std::string& message)
 	{
 		auto token1 = message[message.length() - 1] - 0xA;
@@ -216,7 +195,7 @@ namespace PacketManager {
 		return elems;
 	}
 
-	std::pair<std::string, int> read_SHS(const std::string& packet) {
+	std::pair<int, std::string> read_SHS(const std::string& packet) {
 
 		size_t firstC = packet.find('C');
 		std::string firstPart = hexToString(packet.substr(0, firstC));
@@ -233,11 +212,12 @@ namespace PacketManager {
 		}
 
 		std::string thirdPart = hexToString(packet.substr(secondC + 1));
+		return { stoi(firstPart),thirdPart };
 
-		return { thirdPart, stoi(firstPart) };
+		//return { thirdPart, stoi(firstPart) };
 	}
 
-	std::tuple<int, int> read_PU(const string& packet) {
+	std::tuple<int, int> read_PU(const std::string& packet) {
 
 		// Find the position of 'C' that separates the two parts
 		size_t paquete_hex_0_len = packet.find(L'C');

@@ -1,13 +1,21 @@
 #pragma once
+#include "Entity.h"
 
-
-class User : public Player
+class User : public Entity
 {
 public:
 	User();
 	~User();
-	int selected_player_id = 0;
-	int selected_npch_id = 0;
+	
+	std::string name;
 
+	bool paralized = false;
+	bool meditando = false;
+	int bcr = 0;
+	int selectedSpell = 0;
+
+	Entity* selectedEntity = nullptr;
+
+	std::unordered_map<std::string, int> spells;
 };
 

@@ -10,11 +10,9 @@
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
 // Windows Header Files:
 #include <windows.h>
-#include <Windows.h>
 #include <comutil.h>
 #include <TlHelp32.h>
 #include <tchar.h>
-#include <tlhelp32.h>
 #include <psapi.h>
 
 #include <iostream>
@@ -33,8 +31,6 @@
 
 #include "stdafx.h"
 #include "detours.h"
-#include "Player.h"
-#include "Npch.h"
 #include "dynamic_lib.h"
 
 // TODO: reference additional headers your program requires here

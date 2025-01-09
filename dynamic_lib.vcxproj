@@ -84,20 +84,20 @@
   <ItemGroup>
     <ClInclude Include="dynamic_lib.h" />
     <ClInclude Include="detours.h" />
+    <ClInclude Include="Entity.h" />
     <ClInclude Include="Globals.h" />
     <ClInclude Include="DlibLogger.h" />
-    <ClInclude Include="RadarManager.h" />
-    <ClInclude Include="Npch.h" />
-    <ClInclude Include="PacketManager.h" />
+    <ClInclude Include="Npc.h" />
     <ClInclude Include="Player.h" />
+    <ClInclude Include="PacketManager.h" />
     <ClInclude Include="PlayerRange.h" />
+    <ClInclude Include="RadarManager.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="Spell.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="User.h" />
     <ClInclude Include="Utils.h" />
-    <ClInclude Include="WindowHandler.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dynamic_lib.cpp" />
@@ -110,10 +110,11 @@
       </PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="DlibLogger.cpp" />
-    <ClCompile Include="RadarManager.cpp" />
-    <ClCompile Include="Npch.cpp" />
-    <ClCompile Include="PacketManager.cpp" />
+    <ClCompile Include="Entity.cpp" />
+    <ClCompile Include="Npc.cpp" />
     <ClCompile Include="Player.cpp" />
+    <ClCompile Include="PacketManager.cpp" />
+    <ClCompile Include="RadarManager.cpp" />
     <ClCompile Include="Spell.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -121,7 +122,6 @@
     </ClCompile>
     <ClCompile Include="User.cpp" />
     <ClCompile Include="Utils.cpp" />
-    <ClCompile Include="WindowHandler.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="detours.lib" />

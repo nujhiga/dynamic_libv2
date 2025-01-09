@@ -20,17 +20,20 @@
 
 #include "stdafx.h"
 #include "detours.h"
-#include "Player.h"
-#include "Npch.h"
 #include "PlayerRange.h"
 #include "RadarManager.h"
 #include "PacketManager.h"
 #include "DlibLogger.h"
 #include "mutex"
 
-extern std::unordered_map<int, Player*> players_in_map;
-extern int user_pos_x;
-extern int user_pos_y;
+#include "Player.h"
+#include "Npc.h"
+
+extern std::unordered_map<int, std::shared_ptr<Player>> mapPlayers;
+extern std::unordered_map<int, std::shared_ptr<Player>> rngPlayers;
+
+extern int userX;
+extern int userY;
 
 extern DlibLogger dlg;
 
@@ -47,48 +50,43 @@ BOOL StartsWithAndNot(BSTR sValue, const WCHAR* pszSubValue, const WCHAR* npszSu
 std::string hexToString(const std::string& hex);
 
 void HideCheat(bool finalizeRadar);
-void MapChanged();
+void newMapChanged();
 //VOID AutoRegenHpMan();
 
 void Intercept_SHS(const std::string& packet);
+std::string GetSelectedLHName();
 int GetSpellPosition(const std::string& sname);
 bool IsSelectedLH(const std::string& sname);
 
 void Intercept_CR(const std::string& packet);
-void AddNpch(int nid, int posX, int posY);
+void Intercept_QQ(const std::string& packet);
+void AddNPC(const std::vector<std::string>& pinfo);
 void RemoveMapNpc(int nid);
 
 void Intercept_CC(BSTR& dataRecv, const std::string& packet);
-void AddPlayer(int pid, const std::vector<std::string>& pinfo);
-bool RemoveMapPlayer(int pid);
+void Intercept_CP(const std::string& packet);
+void AddPlayer(int pid, bool detected, const std::vector<std::string>& pinfo);
+void RemoveMapPlayer(int pid);
 
 void Intercept_MP(const std::string& packet);
-void UpdateNpcPos(int nid, int posX, int posY, bool inRange);
-//void UpdatePlayerPos(int pid, int posX, int posY, bool inRange);
-bool UpdatePlayerPos(int pid, int posX, int posY, bool inRange);
-
-void AddPlayerRange(int pid, int posX, int posY);
-void RemoveRangePlayer(std::unordered_map<int, PlayerRange*>::iterator& it);
-void RemoveRangePlayer(int pid);
-
-void RemoveRangeNpc(int nid);
 
 template <typename MapType>
 void CleanupMap(MapType& map);
-void CleanupRangeNpcs();
 
 void Intercept_PU(const std::string& packet);
 
 void Intercept_LC(const std::string& packet);
 void SetManualTarget(int posX, int posY);
 
-void Intercept_V3(BSTR& dataRecv, const string& packet);
+void Intercept_V3(BSTR& dataRecv, const std::string& packet);
 
 void Intercept_M1234(const std::string& packet);
 
 void Intercept_BP(const std::string& packet);
 
 void Intercept_WLC(BSTR* dataSend, const std::string packet);
+
+void Intercept_LH(const std::string& packet);
 
 bool IsInRange(int posX, int posY);
 

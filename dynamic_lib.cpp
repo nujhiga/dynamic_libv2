@@ -1,7 +1,6 @@
 #include "stdafx.h"
 
 namespace pm = PacketManager;
-namespace rm = RadarManager;
 
 #pragma comment(lib, "comsuppw.lib")
 
@@ -11,24 +10,31 @@ DWORD oldTTeclas = GetTickCount();
 bool isRadarRunning = false;
 bool hideCheating = false;
 bool writeLogs = true;
+bool avoidPacketLog = false;
 
 int cast_mode = 0;
-//int cast_target = 0;
 
-int user_pos_x = 0;
-int user_pos_y = 0;
+int userX = 0;
+int userY = 0;
 
-int user_id = 0;
-int user_faction = 0;
-bool user_paralized = false;
-bool user_meditando = false;
+int userPID = 0;
+int userBCR = 0;
+bool userParalized = false;
+bool userMeditando = false;
 
 std::atomic<bool> lockM1234{ false };
 
-const std::string user_name = "growland";
+const std::string userName = "growland";
 const std::string del_spell_words = ";1 ";
 
-std::unordered_map<std::string, int> userSpells;
+std::unordered_map<int, std::string> userSpells;
+
+std::unordered_set<std::string> whiteSpells = {
+	"Remover paralisis",
+	"Invisibilidad",
+	"Celeridad",
+	"Fuerza"
+};
 
 const std::string Remo = "Remover paralisis";
 const std::string Apoca = "Apocalipsis";
@@ -43,29 +49,47 @@ const std::string Cele = "Celeridad";
 const std::string Fue = "Fuerza";
 const std::string EleA = "Invocar elemental de agua";
 
-//const std::string CMD_MEDITAR = "meditar";
+std::unordered_set<int> npcsBodyToAvoid =
+{
+	154, //ele agua
+	15, //guardia impe
+	268, //guardia caos
+	19, //sastre
+	33, //bebida?
+	17, //bardo ?
+	16, //herrero?
+	34, //pociones
+	37, //banco
+};
 
 bool uk_flag = false;
 bool lh_flag = false;
-bool auto_cast_flag = false;
+bool autoCast = false;
+bool toogleAutoCast = false;
+bool directCast = false;
 
-int selected_player_id = 0;
-int selected_npch_id = 0;
-int selected_lh = 0;
+
+int selectedPid = 0;
+int selectedNid = 0;
+int selectedLH = 0;
+bool isSelLhWhite = false;
 
 const int WAV_SCREEN_CAPTURE = 555;
 const int WAV_PRC_PPL_PPP = 324;
+const int WAV_FEATURE_ON = 194;
+const int WAV_FEATURE_OFF = 199;
 
-std::unordered_map<int, Player*> players_in_map;
-std::unordered_map<int, PlayerRange*> players_in_range;
+std::unordered_map<int, std::shared_ptr<Npc>> rngNpcs;
+std::unordered_map<int, std::shared_ptr<Npc>> mapNpcs;
 
-std::unordered_map<int, Npch*> npcs_in_map;
-std::unordered_map<int, std::pair<int, int>> npcs_in_range;
+std::unordered_map<int, std::shared_ptr<Player>> rngPlayers;
+std::unordered_map<int, std::shared_ptr<Player>> mapPlayers;
 
 std::vector<std::string> packets;
 
 const std::string LOG_FILEPATH = "C:\\Users\\joaco\\Documents\\dlib_log.txt";
 DlibLogger dlg(LOG_FILEPATH);
+RadarManager radar("Untitled - Notepad");
 
 typedef VOID(WINAPI* PRecvData)(BSTR data);
 PRecvData PFunctionRecv = (PRecvData)0x0084F0E0; //Pointer to where the original HandleData() starts
@@ -94,6 +118,7 @@ VOID WINAPI MyRecvData(BSTR dataRecv)
 {
 	__asm PUSHAD;
 	__asm PUSHFD;
+	avoidPacketLog = false;
 
 	if (StartsWith(dataRecv, L"PAIN")) {
 		PlayLocalWav(WAV_SCREEN_CAPTURE);
@@ -108,64 +133,90 @@ VOID WINAPI MyRecvData(BSTR dataRecv)
 	if (StartsWith(dataRecv, L"LH")) {
 		uk_flag = false;
 		lh_flag = false;
-		auto_cast_flag = false;
+		isSelLhWhite = false;
+		autoCast = false;
+		//directCast = false;
+		avoidPacketLog = true;
 	}
 
 	if (StartsWith(dataRecv, L"MEDOK")) {
-		user_meditando = !user_meditando;
+		userMeditando = !userMeditando;
+		avoidPacketLog = true;
 	}
 
 	if (StartsWith(dataRecv, L"V3")) {
 		std::string packet = pm::ConvertBSTRPacket(dataRecv, 2);
 		Intercept_V3(dataRecv, packet);
+		avoidPacketLog = true;
 	}
 
 	//ToDo :: if (StartsWith(dataRecv, L"EST")) 
-	//ToDo :: if (StartsWith(dataRecv, L"CP")) to verify is player has died
 
 	if (StartsWith(dataRecv, L"BP")) {
 		std::string packet = pm::ConvertBSTRPacket(dataRecv, 2);
 		Intercept_BP(packet);
+		avoidPacketLog = true;
 	}
 
 	if (StartsWith(dataRecv, L"CM")) {
-		MapChanged();
+		newMapChanged();
+		avoidPacketLog = true;
 	}
 
 	if (StartsWith(dataRecv, L"CC")) {
 		std::string packet = pm::ConvertBSTRPacket(dataRecv, 2);
 		Intercept_CC(dataRecv, packet);
+		//avoidPacketLog = true;
+	}
+
+	//ToDo :: if (StartsWith(dataRecv, L"CP")) to verify is player has died
+
+	if (StartsWith(dataRecv, L"CP")) {
+		std::string packet = pm::ConvertBSTRPacket(dataRecv, 2);
+		Intercept_CP(packet);
 	}
 
 	if (StartsWithAndNot(dataRecv, L"CR", L"CRA")) {
 		std::string packet = pm::ConvertBSTRPacket(dataRecv, 2);
 		Intercept_CR(packet);
+		avoidPacketLog = true;
 	}
 
-	if (StartsWith(dataRecv, L"MP")) {
+	if (StartsWith(dataRecv, L"QQ")) {
+		std::string packet = pm::ConvertBSTRPacket(dataRecv, 2);
+		Intercept_QQ(packet);
+		avoidPacketLog = true;
+	}
+
+	if (StartsWith(dataRecv, { L"MP", L"LP" })) {
 		std::string packet = pm::ConvertBSTRPacket(dataRecv, 2);
 		Intercept_MP(packet);
+		avoidPacketLog = false;
 	}
 
 	if (StartsWith(dataRecv, L"P9")) {
-		user_paralized = true;
+		userParalized = true;
+		avoidPacketLog = true;
 	}
 
 	if (StartsWith(dataRecv, L"P8")) {
-		user_paralized = false;
+		userParalized = false;
+		avoidPacketLog = true;
 	}
 
 	if (StartsWith(dataRecv, L"PU")) {
 		std::string packet = pm::ConvertBSTRPacket(dataRecv, 2);
 		Intercept_PU(packet);
+		avoidPacketLog = true;
 	}
 
 	if (StartsWith(dataRecv, L"SHS")) {
 		std::string packet = pm::ConvertBSTRPacket(dataRecv, 3);
 		Intercept_SHS(packet);
+		avoidPacketLog = true;
 	}
 
-	if (writeLogs) dlg.logData(pm::ConvertBSTRToString(dataRecv), DlibLogger::LogType::RECV);
+	if (writeLogs && !avoidPacketLog) dlg.logData(pm::ConvertBSTRToString(dataRecv), DlibLogger::LogType::RECV);
 
 	PFunctionRecv(dataRecv);
 
@@ -177,20 +228,23 @@ VOID WINAPI MySendData(BSTR* dataSend)
 {
 	__asm PUSHAD;
 	__asm PUSHFD;
+	avoidPacketLog = false;
 
 	if (StartsWith(*dataSend, L"WLC")) {
 		std::string packet = pm::ConvertBSTRPacket(*dataSend, 3);
 		Intercept_WLC(dataSend, packet);
+		avoidPacketLog = true;
 	}
 
 	if (StartsWith(*dataSend, L"UK1")) {
 		uk_flag = true;
+		avoidPacketLog = true;
 	}
 
 	if (StartsWith(*dataSend, L"LH")) {
 		std::string packet = pm::ConvertBSTRPacket(*dataSend, 2);
-		selected_lh = stoi(packet);
-		lh_flag = true;
+		Intercept_LH(packet);
+		avoidPacketLog = true;
 	}
 
 	if (StartsWith(*dataSend, L"LC")) {
@@ -198,14 +252,16 @@ VOID WINAPI MySendData(BSTR* dataSend)
 			std::string packet = pm::ConvertBSTRPacket(*dataSend, 2);
 			Intercept_LC(packet);
 		}
+		avoidPacketLog = true;
 	}
 
 	if (StartsWith(*dataSend, { L"M1",L"M2", L"M3", L"M4" })) {
 		std::string packet = pm::ConvertBSTRPacket(*dataSend, 1);
 		Intercept_M1234(packet);
+		avoidPacketLog = true;
 	}
 
-	if (writeLogs) dlg.logData(pm::ConvertBSTRToString(*dataSend), DlibLogger::LogType::SEND);
+	if (writeLogs && !avoidPacketLog) dlg.logData(pm::ConvertBSTRToString(*dataSend), DlibLogger::LogType::SEND);
 
 	PFunctionSend(dataSend);
 
@@ -225,10 +281,10 @@ int WINAPI MyLoop()
 		if ((GetKeyState(VK_MULTIPLY) & 0x100) != 0) {
 
 			if (!isRadarRunning) {
-				isRadarRunning = rm::InitRadar("Untitled - Notepad");
+				isRadarRunning = radar.initRadar();
 			}
 			else {
-				rm::FinalizeRadar();
+				radar.finalizeRadar();
 				isRadarRunning = false;
 			}
 
@@ -239,8 +295,33 @@ int WINAPI MyLoop()
 			HideCheat(true);
 		}
 
+		if ((GetKeyState(VK_F1) & 0x100) != 0) {
+			directCast = !directCast;
+
+			if (directCast)
+				PlayLocalWav(WAV_FEATURE_ON);
+			else
+				PlayLocalWav(WAV_FEATURE_OFF);
+
+			Sleep(15);
+		}
+
+		if ((GetKeyState(VK_F2) & 0x100) != 0) {
+			autoCast = false;
+			directCast = false;
+			toogleAutoCast = !toogleAutoCast;
+
+			if (toogleAutoCast)
+				PlayLocalWav(WAV_FEATURE_ON);
+			else
+				PlayLocalWav(WAV_FEATURE_OFF);
+
+			Sleep(15);
+		}
+
 		if ((GetKeyState(VK_XBUTTON2) & 0x100) != 0) {
-			auto_cast_flag = true;
+			toogleAutoCast = false;
+			autoCast = true;
 		}
 
 		if ((GetKeyState(VK_XBUTTON1) & 0x100) != 0) {
@@ -252,9 +333,6 @@ int WINAPI MyLoop()
 		if ((GetKeyState(VK_DELETE) & 0x100) != 0) {
 
 		}
-
-		//if ((GetKeyState(VK_INSERT) & 0x100) != 0) {
-		//}
 
 		oldTTeclas = GetTickCount();
 
@@ -277,40 +355,39 @@ void HideCheat(bool finalizeRadar) {
 	hideCheating = true;
 
 	if (isRadarRunning) {
-		rm::FinalizeRadar();
+		radar.finalizeRadar();
 		isRadarRunning = false;
 	}
 
-	Sleep(25);
-
-	for (const auto& player : players_in_map) {
-		if (!player.second) continue;
+	for (const auto& player : mapPlayers) {
 
 		auto& pl = player.second;
 
 		if (pl->inviDetected) {
 
-			pl->name = pl->orgName;
-			pl->isInvisible = true;
-			pl->inviDetected = false;
+			if (pl->name.find(" [I]") != std::string::npos)
+				pl->name.erase(pl->name.length() - 4, 4);
+
+			pl->invi = 1;
+			pl->inviDetected = 0;
 
 			SendToClient(pm::build_BP(pl->id));
-			SendToClient(pm::build_CC(player));
+			SendToClient(pm::build_CC(pl));
 		}
 	}
-	Sleep(25);
+
+	Sleep(35);
 }
 
-void MapChanged() {
+void newMapChanged() {
+	mapPlayers.clear();
+	rngPlayers.clear();
 
-	CleanupMap(players_in_map);
-	CleanupMap(players_in_range);
+	mapNpcs.clear();
+	rngNpcs.clear();
 
-	CleanupMap(npcs_in_map);
-	CleanupRangeNpcs();
-
-	selected_npch_id = 0;
-	selected_player_id = 0;
+	selectedNid = 0;
+	selectedPid = 0;
 }
 
 void Intercept_SHS(const std::string& packet) {
@@ -318,82 +395,59 @@ void Intercept_SHS(const std::string& packet) {
 	userSpells.emplace(sinfo);
 }
 
+bool IsSelectedLH(const std::string& sname) {
+	if (selectedLH <= 0) return false;
+	return selectedLH == GetSpellPosition(sname);
+}
+
 int GetSpellPosition(const std::string& sname) {
-	auto& its = userSpells.find(sname);
-	if (its != userSpells.end())
-		return its->second;
+	for (const auto& spl : userSpells) {
+		if (spl.second == sname)
+			return spl.first;
+	}
 
 	return -1;
 }
 
-bool IsSelectedLH(const std::string& sname) {
-	return GetSpellPosition(sname) == selected_lh;
+std::string GetSelectedLHName() {
+	if (selectedLH <= 0) return "";
+	auto spl = userSpells.find(selectedLH);
+	if (spl != userSpells.end())
+		return spl->second;
+
+	return "";
 }
 
 void Intercept_CR(const std::string& packet) {
 	auto pinfo = pm::split(packet, ',');
 
-	if (stoi(pinfo[1]) > 0) return;
+	if (pinfo[1] != "0") return;
+	if (npcsBodyToAvoid.find(stoi(pinfo[0])) != npcsBodyToAvoid.end()) return;
 
-	int nid = stoi(pinfo[3]);
-	int posX = stoi(pinfo[4]);
-	int posY = stoi(pinfo[5]);
-
-	AddNpch(nid, posX, posY);
+	AddNPC(pinfo);
 }
 
-void AddNpch(int nid, int posX, int posY) {
+void Intercept_QQ(const std::string& packet) {
+	auto pinfo = pm::split(packet, '@');
+	int nid = stoi(pinfo[0]);
+	RemoveMapNpc(nid);
+}
 
-	auto itn = npcs_in_map.find(nid);
-	if (itn != npcs_in_map.end()) return;
+void AddNPC(const std::vector<std::string>& pinfo) {
+	int nid = stoi(pinfo[3]);
+	if (mapPlayers.count(nid) > 0) return;
 
-	Npch* npc = new Npch();
-	npc->id = nid;
-	npc->posX = posX;
-	npc->posY = posY;
+	auto npc = std::make_shared<Npc>(pinfo, false);
+	mapNpcs.emplace(nid, npc);
 
-	npcs_in_map.emplace(nid, npc);
-
-	dlg.logDebug("AddNpch: npcs_in_map.emplace: ", "npcs_in_map.size()",
-		npcs_in_map.size(), "nid", nid);
-
-	if (IsInRange(posX, posY)) {
-		npcs_in_range.emplace(nid, std::make_pair(posX, posY));
-		dlg.logDebug("AddNpch: npcs_in_range.emplace: ", "npcs_in_range.size()",
-			npcs_in_range.size(), "nid", nid);
+	if (IsInRange(npc->posX, npc->posY)) {
+		rngNpcs.emplace(nid, npc);
 	}
 }
-
-//void AddNpch(int nid, int posX, int posY) {
-//
-//	auto itn = npcs_in_map.find(nid);
-//
-//	if (itn == npcs_in_map.end()) {
-//
-//		Npch* npc = new Npch();
-//		npc->id = nid;
-//		npc->posX = posX;
-//		npc->posY = posY;
-//
-//		npcs_in_map.emplace(nid, npc);
-//
-//		if (IsInRange(posX, posY)) {
-//			npcs_in_range.emplace(nid, std::make_pair(posX, posY));
-//		}
-//	}
-//}
 
 void RemoveMapNpc(int nid) {
-	auto itn = npcs_in_map.find(nid);
-
-	if (itn != npcs_in_map.end()) {
-		if (itn->second) {
-			delete itn->second;
-			itn->second = nullptr;
-		}
-		npcs_in_map.erase(itn);
-		//RemoveRangeNpc(nid);
-	}
+	rngNpcs.erase(nid);
+	mapNpcs.erase(nid);
 }
 
 void Intercept_CC(BSTR& dataRecv, const std::string& packet) {
@@ -401,15 +455,17 @@ void Intercept_CC(BSTR& dataRecv, const std::string& packet) {
 	auto pinfo = pm::split(packet, ',');
 	int pid = stoi(pinfo[3]);
 
-	if (pinfo[11] == user_name) {
+	if (pinfo[11] == userName) {
 
-		user_id = pid;
+		userPID = pid;
 		SetUserpos(stoi(pinfo[4]), stoi(pinfo[5]));
-		user_faction = stoi(pinfo[12]);
+		userBCR = stoi(pinfo[12]);
 	}
 	else {
 
-		if (!hideCheating && pinfo[13] == "1")
+		bool detected = !hideCheating && pinfo[13] == "1";
+
+		if (detected)
 		{
 			pinfo[11] += " [I]";
 			pinfo[13] = "0";
@@ -417,173 +473,83 @@ void Intercept_CC(BSTR& dataRecv, const std::string& packet) {
 			dataRecv = pm::ConvertStringToBSTR(pm::build_CC(pinfo));
 		}
 
-		AddPlayer(pid, pinfo);
+		AddPlayer(pid, detected, pinfo);
 	}
 }
 
-void AddPlayer(int pid, const std::vector<std::string>& pinfo) {
+void Intercept_CP(const std::string& packet) {
+	auto pinfo = pm::split(packet, ',');
+	int pid = stoi(pinfo[0]);
+	if (pid == userPID) return;
 
-	auto it = players_in_map.find(pid);
-	bool inviDetected = !hideCheating && stoi(pinfo[13]) == 1;
+	auto itpm = mapPlayers.find(pid);
+	if (itpm != mapPlayers.end()) {
+		int body = stoi(pinfo[1]);
+		int head = stoi(pinfo[2]);
 
-	if (it == players_in_map.end()) {
-		players_in_map.emplace(pid, new Player{ pinfo });
-		dlg.logDebug("AddPlayer: players_in_map.emplace: ", "players_in_map.size()",
-			players_in_map.size(), "pid", pid);
-	}
-	else {
-		it->second->inviDetected = inviDetected;
+		if (itpm->second->body != body)
+			itpm->second->body = body;
+
+		if (itpm->second->head != head)
+			itpm->second->head = head;
 	}
 }
 
-bool RemoveMapPlayer(int pid) {
+void AddPlayer(int pid, bool detected, const std::vector<std::string>& pinfo) {
+	if (mapPlayers.count(pid) > 0) return;
 
-	auto itp = players_in_map.find(pid);
+	auto pl = std::make_shared<Player>(pinfo, detected);
+	mapPlayers.emplace(pid, pl);
 
-	if (itp != players_in_map.end()) {
-
-		if (itp->second) {
-			delete itp->second;
-			itp->second = nullptr;
-		}
-
-		players_in_map.erase(itp);
-		dlg.logDebug("RemoveMapPlayer: players_in_map.erase: ", "players_in_map.size()",
-			players_in_map.size(), "pid", pid);
-		//RemoveRangePlayer(pid);
-
-		return true;
+	if (IsInRange(pl->posX, pl->posY)) {
+		rngPlayers.emplace(pid, pl);
 	}
+}
 
-	return false;
+void RemoveMapPlayer(int pid) {
+	rngPlayers.erase(pid);
+	mapPlayers.erase(pid);
 }
 
 void Intercept_MP(const std::string& packet) {
 	auto pinfo = pm::split(packet, ',');
 
-	int id = stoi(pinfo[0]);
+	int eid = stoi(pinfo[0]);
 	int posX = stoi(pinfo[1]);
 	int posY = stoi(pinfo[2]);
 	bool inRange = IsInRange(posX, posY);
 
-	//if (pinfo[3] == "") {
-	//	dlg.logDebug("Intercept_MP: pinfo.size() == 3: ", "inRange", inRange, "id", id);
-	if (!UpdatePlayerPos(id, posX, posY, inRange))
-		UpdateNpcPos(id, posX, posY, inRange);
-	//}
-	//else {
-	//	dlg.logDebug("Intercept_MP: pinfo.size() != 3: ", "inRange", inRange, "id", id);
-	//}
+	auto itpm = mapPlayers.find(eid);
+	if (itpm != mapPlayers.end()) {
+		itpm->second->posX = posX;
+		itpm->second->posY = posY;
 
-	//if (pinfo[3] == "") {
-	//	dlg.logDebug("Intercept_MP: pinfo.size() == 3: ", "inRange", inRange, "id", id);
-	//	UpdateNpcPos(id, posX, posY, inRange);
-	//}
-	//else {
-	//	dlg.logDebug("Intercept_MP: pinfo.size() != 3: ", "inRange", inRange, "id", id);
-	//	UpdatePlayerPos(id, posX, posY, inRange);
-	//}
-}
-
-void UpdateNpcPos(int nid, int posX, int posY, bool inRange) {
-
-	auto itm = npcs_in_map.find(nid);
-	auto itr = npcs_in_range.find(nid);
-
-	if (itm != npcs_in_map.end() && itm->second) {
-		itm->second->posX = posX;
-		itm->second->posY = posY;
-		dlg.logDebug("UpdateNpcPos: npcs_in_map.end()->posupd: ", "nid", nid);
-	}
-
-	if (itr != npcs_in_range.end()) {
-		if (inRange) {
-			itr->second = std::make_pair(posX, posY);
-			dlg.logDebug("UpdateNpcPos: itr != npcs_in_range.end()->posupd: ", "inRange", inRange, "nid", nid);
+		auto itpr = rngPlayers.find(eid);
+		if (itpr != rngPlayers.end()) {
+			if (!inRange) {
+				rngPlayers.erase(itpr);
+			}
 		}
-		else {
-			npcs_in_range.erase(itr);
-			dlg.logDebug("UpdateNpcPos: itr != npcs_in_range.end()->.erase: ",
-				"npcs_in_range.size()", npcs_in_range.size(), "inRange", inRange, "nid", nid);
+		else if (inRange) {
+			rngPlayers.emplace(eid, itpm->second);
 		}
 	}
-	else if (inRange) {
-		npcs_in_range.emplace(nid, std::make_pair(posX, posY));
-		dlg.logDebug("UpdateNpcPos: itr == npcs_in_range.end()->.emplace: ",
-			"npcs_in_range.size()", npcs_in_range.size(), "inRange", inRange, "nid", nid);
-	}
-}
 
-bool UpdatePlayerPos(int pid, int posX, int posY, bool inRange) {
+	auto itnm = mapNpcs.find(eid);
+	if (itnm != mapNpcs.end()) {
+		itnm->second->posX = posX;
+		itnm->second->posY = posY;
 
-	auto itp = players_in_map.find(pid);
-	auto itr = players_in_range.find(pid);
-	bool updated = false;
-
-	if (itp != players_in_map.end() && itp->second) {
-		itp->second->posX = posX;
-		itp->second->posY = posY;
-		updated = true;
-		dlg.logDebug("UpdatePlayerPos: players_in_map.end()->posupd: ", "pid", pid);
-	}
-
-	if (itr != players_in_range.end()) {
-		if (inRange) {
-			itr->second->posX = posX;
-			itr->second->posY = posY;
-			dlg.logDebug("UpdatePlayerPos: itr != players_in_range.end()->posupd: ",
-				"players_in_range.size()", players_in_range.size(), "inRange", inRange, "pid", pid);
+		auto itnr = rngNpcs.find(eid);
+		if (itnr != rngNpcs.end()) {
+			if (!inRange) {
+				rngNpcs.erase(itnr);
+			}
 		}
-		else {
-			RemoveRangePlayer(itr);
+		else if (inRange) {
+			rngNpcs.emplace(eid, itnm->second);
 		}
 	}
-	else if (inRange) {
-		AddPlayerRange(pid, posX, posY);
-	}
-
-	return updated;
-}
-
-void AddPlayerRange(int pid, int posX, int posY) {
-	PlayerRange* pr = new PlayerRange();
-
-	pr->ID = pid;
-	pr->posX = posX;
-	pr->posY = posY;
-
-	players_in_range.emplace(pid, pr);
-}
-
-void RemoveRangePlayer(std::unordered_map<int, PlayerRange*>::iterator& it) {
-
-	if (it->second) {
-		delete it->second;
-		it->second = nullptr;
-	}
-
-	players_in_range.erase(it);
-	dlg.logDebug("RemoveRangePlayer: players_in_range.erase by it: ", "players_in_range.size()", players_in_range.size());
-}
-
-void RemoveRangePlayer(int pid) {
-	auto itr = players_in_range.find(pid);
-
-	if (itr != players_in_range.end()) {
-
-		if (itr->second) {
-			delete itr->second;
-			itr->second = nullptr;
-		}
-		players_in_range.erase(itr);
-	}
-	dlg.logDebug("RemoveRangePlayer: players_in_range.erase> ",
-		"players_in_range.size()", players_in_range.size(), "pid", pid);
-
-}
-
-void RemoveRangeNpc(int nid) {
-	npcs_in_range.erase(nid);
 }
 
 template <typename MapType>
@@ -598,15 +564,9 @@ void CleanupMap(MapType& map) {
 	map.clear();
 }
 
-void CleanupRangeNpcs() {
-	npcs_in_range.clear();
-}
-
 void Intercept_PU(const std::string& packet) {
 	auto xy = pm::read_PU(packet);
-	int x = std::get<0>(xy);
-	int y = std::get<1>(xy);
-	SetUserpos(x, y);
+	SetUserpos(std::get<0>(xy), std::get<1>(xy));
 }
 
 void Intercept_LC(const std::string& packet) {
@@ -620,18 +580,16 @@ void Intercept_LC(const std::string& packet) {
 
 void SetManualTarget(int posX, int posY) {
 
-	for (const auto& pr : players_in_range) {
-		if (!pr.second) continue;
-
+	for (const auto& pr : rngPlayers) {
 		if (pr.second->posX == posX && pr.second->posY == posY) {
-			selected_player_id = pr.first;
+			selectedPid = pr.first;
 			return;
 		}
 	}
 
-	for (const auto& nr : npcs_in_range) {
-		if (nr.second.first == posX && nr.second.second == posY) {
-			selected_npch_id = nr.first;
+	for (const auto& nr : rngNpcs) {
+		if (nr.second->posX == posX && nr.second->posY == posY) {
+			selectedNid = nr.first;
 			break;
 		}
 	}
@@ -645,34 +603,34 @@ void Intercept_V3(BSTR& dataRecv, const std::string& packet) {
 
 	int pid = stoi(pinfo[1]);
 
-	if (pid == user_id) return;
+	auto itp = mapPlayers.find(pid);
 
-	auto itp = players_in_map.find(pid);
-
-	if (itp != players_in_map.end() && itp->second) {
+	if (itp != mapPlayers.end()) {
 		auto& pl = itp->second;
+		if (pl->name == userName) return;
+
 		bool invi = pinfo[4] == "1";
-		pl->isInvisible = invi;
 
 		if (invi) {
-
 			pl->name += " [I]";
-			pl->isInvisible = false;
-			pl->inviDetected = true;
+			pl->invi = 0;
+			pl->inviDetected = 1;
+			pinfo[4] = "0";
 
 			SendToClient(pm::build_BP(pid));
-			SendToClient(pm::build_CC(*pl));
+			SendToClient(pm::build_CC(pl));
 
-			pinfo[4] = "0";
 			SysFreeString(dataRecv);
 			dataRecv = pm::ConvertStringToBSTR(pm::build_V3(pinfo));
 		}
 		else {
-			pl->name = pl->orgName;
-			pl->inviDetected = false;
+			if (pl->name.find(" [I]") != std::string::npos)
+				pl->name.erase(pl->name.length() - 4, 4);
+
+			pl->inviDetected = 0;
 
 			SendToClient(pm::build_BP(pid));
-			SendToClient(pm::build_CC(*pl));
+			SendToClient(pm::build_CC(pl));
 		}
 	}
 }
@@ -680,26 +638,26 @@ void Intercept_V3(BSTR& dataRecv, const std::string& packet) {
 void Intercept_M1234(const std::string& packet) {
 
 	if (lockM1234.load()) return;
-	if (user_paralized || user_meditando) return;
+	if (userParalized || userMeditando) return;
 
 	int dir = stoi(packet);
 	switch (dir)
 	{
 		case 1:
-			if (user_pos_y - 1 >= 11)
-				user_pos_y--;
+			if (userY - 1 >= 11)
+				userY--;
 			break;
 		case 2:
-			if (user_pos_x + 1 <= 88)
-				user_pos_x++;
+			if (userX + 1 <= 88)
+				userX++;
 			break;
 		case 3:
-			if (user_pos_y + 1 <= 90)
-				user_pos_y++;
+			if (userY + 1 <= 90)
+				userY++;
 			break;
 		case 4:
-			if (user_pos_x - 1 >= 13)
-				user_pos_x--;
+			if (userX - 1 >= 13)
+				userX--;
 			break;
 		default:
 			break;
@@ -711,12 +669,14 @@ void Intercept_M1234(const std::string& packet) {
 
 void Intercept_BP(const std::string& packet) {
 	int eid = stoi(packet);
-	if (eid == user_id) return;
-	if (RemoveMapPlayer(eid)) return;
+	if (eid == userPID) return;
+
+	RemoveMapPlayer(eid);
 	RemoveMapNpc(eid);
 }
 
 void Intercept_WLC(BSTR* dataSend, const std::string packet) {
+	if (directCast) return;
 
 	auto pinfo = pm::split(packet, ',');
 
@@ -728,13 +688,16 @@ void Intercept_WLC(BSTR* dataSend, const std::string packet) {
 		int _posX = -1, _posY = -1;
 		std::tuple<int, int> xy = { -1, -1 };
 
-		if (auto_cast_flag) {
+		if (toogleAutoCast && isSelLhWhite) {
+			xy = GetUserTargetPos();
+		}
+		else if (autoCast) {
 			xy = GetUserTargetPos();
 		}
 		else if (cast_mode == 0) {
 			xy = GetClosestTargetPos(posX, posY);
 		}
-		else if (cast_mode == 1 && selected_player_id > 0) {
+		else if (cast_mode == 1 && selectedPid > 0) {
 			xy = GetManualTargetPos();
 		}
 
@@ -751,27 +714,40 @@ void Intercept_WLC(BSTR* dataSend, const std::string packet) {
 	}
 }
 
+void Intercept_LH(const std::string& packet) {
+	selectedLH = stoi(packet);
+	lh_flag = true;
+	isSelLhWhite = false;
+
+	auto uspl = userSpells.find(selectedLH);
+	if (uspl != userSpells.end()) {
+		isSelLhWhite = uspl->second == Remo || uspl->second == Invi ||
+			uspl->second == Cele || uspl->second == Fue;
+	}
+}
+
 bool IsInRange(int posX, int posY) {
-	bool xrange = std::abs(posX - user_pos_x) <= 11;
-	bool yrange = std::abs(posY - user_pos_y) <= 9;
+	if (userX == 0 || userY == 0) return false;
+	bool xrange = std::abs(posX - userX) <= 11;
+	bool yrange = std::abs(posY - userY) <= 9;
 	return xrange && yrange;
 }
 
 bool IsUserPosOutbounds() {
-	return user_pos_x > 88 || user_pos_y > 90 || user_pos_x < 13 || user_pos_y < 11;
+	return userX > 88 || userY > 90 || userX < 13 || userY < 11;
 }
 
 void SetUserpos(int posX, int posY) {
 	lockM1234.store(true);
-	user_pos_x = posX;
-	user_pos_y = posY;
+	userX = posX;
+	userY = posY;
 	lockM1234.store(false);
 }
 
 std::tuple<int, int> GetManualTargetPos() {
-	auto itp = players_in_range.find(selected_player_id);
+	auto itp = rngPlayers.find(selectedPid);
 
-	if (itp != players_in_range.end())
+	if (itp != rngPlayers.end())
 		return { itp->second->posX, itp->second->posY };
 
 	return { -1, -1 };
@@ -781,7 +757,7 @@ std::tuple<int, int> GetUserTargetPos() {
 	if (IsUserPosOutbounds())
 		return { -1, -1 };
 
-	return { user_pos_x, user_pos_y };
+	return { userX, userY };
 }
 
 std::tuple<int, int> GetClosestTargetPos(int posX, int posY) {
@@ -798,27 +774,17 @@ std::tuple<int, int> GetClosestTargetPos(int posX, int posY) {
 		}
 	};
 
-	for (const auto& pr : players_in_range) {
-		if (!pr.second) continue;
+	for (const auto& pr : rngPlayers) {
+		if (pr.second->bcr == userBCR && !isSelLhWhite) continue;
 		updateClosest(pr.second->posX, pr.second->posY);
 	}
-
-	//if (minDistance < 8 && !players_in_range.empty() && (closestX == -1 || closestY == -1)) {
-	//	dlg.logDebug("GetClosestTargetPos: Player should be finded",
-	//		"posX", posX, "posY", posY, "minDistance", minDistance);
-	//}
 
 	if (closestX > -1 && closestY > -1)
 		return { closestX, closestY };
 
-	for (const auto& nr : npcs_in_range) {
-		updateClosest(nr.second.first, nr.second.second);
+	for (const auto& nr : rngNpcs) {
+		updateClosest(nr.second->posX, nr.second->posY);
 	}
-
-	//if (minDistance < 8 && !npcs_in_range.empty() && (closestX == -1 || closestY == -1)) {
-	//	dlg.logDebug("GetClosestTargetPos: Npc should be finded",
-	//		"posX", posX, "posY", posY, "minDistance", minDistance);
-	//}
 
 	if (closestX == -1 || closestY == -1) {
 		return { posX, posY };
@@ -827,117 +793,44 @@ std::tuple<int, int> GetClosestTargetPos(int posX, int posY) {
 	return { closestX, closestY };
 }
 
-//ToDo review cheknewtarg
 void CheckPlayerTargets() {
-	//dlg.logDebug("CheckPlayerTargets:");
-
-	for (const auto& pm : players_in_map) {
-		if (!pm.second) continue;
+	for (const auto& pm : mapPlayers) {
 
 		int pid = pm.second->id;
-		int pmX = pm.second->posX;
-		int pmY = pm.second->posY;
+		bool inRange = IsInRange(pm.second->posX, pm.second->posY);
 
-		auto itr = players_in_range.find(pid);
-		bool inRange = IsInRange(pmX, pmY);
-
-		if (itr != players_in_range.end()) {
+		auto itpr = rngPlayers.find(pid);
+		if (itpr != rngPlayers.end()) {
 			if (!inRange) {
-				RemoveRangePlayer(itr);
-				continue;
+				rngPlayers.erase(itpr);
 			}
-
-			//if (itr->second->posX != pmX && itr->second->posY != pmY) {
-			itr->second->posX = pmX;
-			itr->second->posY = pmY;
-			//}
 		}
 		else if (inRange) {
-			AddPlayerRange(pid, pmX, pmY);
+			rngPlayers.emplace(pid, pm.second);
 		}
 	}
 }
 
 void CheckNpcTargets() {
-	//dlg.logDebug("CheckNpcTargets:");
-	for (const auto& nm : npcs_in_map) {
-		if (!nm.second) continue;
-
+	for (const auto& nm : mapNpcs) {
 		int nid = nm.second->id;
-		int nmX = nm.second->posX;
-		int nmY = nm.second->posY;
 
-		auto itr = npcs_in_range.find(nid);
-		bool inRange = IsInRange(nmX, nmY);
+		bool inRange = IsInRange(nm.second->posX, nm.second->posY);
 
-		if (itr != npcs_in_range.end()) {
+		auto itnr = rngNpcs.find(nid);
+		if (itnr != rngNpcs.end()) {
 			if (!inRange) {
-				RemoveRangeNpc(nid);
-				continue;
+				rngNpcs.erase(itnr);
 			}
-
-			//if (itr->second.first != nmX && itr->second.second != nmY) {
-			itr->second.first = nmX;
-			itr->second.second = nmY;
-			//}
 		}
 		else if (inRange) {
-			npcs_in_range.emplace(nid, std::make_pair(nmX, nmY));
+			rngNpcs.emplace(nid, nm.second);
 		}
 	}
 }
 
-//void CheckNewTargets() {
-//	// Process players in the map
-//	for (const auto& pm : players_in_map) {
-//		auto& pl = pm.second;
-//		
-//		int playerId = pm.second->id;
-//		auto itp = players_in_range.find(playerId);
-//		bool inRange = IsInRange(pm.second->posX, pm.second->posY);
-//
-//		if (inRange) {
-//			if (itp == players_in_range.end()) {
-//				// Add player to the range if not already present
-//				PlayerRange* pr = new PlayerRange();
-//				pr->ID = playerId;
-//				pr->posX = pm.second->posX;
-//				pr->posY = pm.second->posY;
-//				pr->faction = pm.second->faction;
-//				players_in_range.emplace(playerId, std::move(pr));
-//
-//				dlg.logDebug("CheckNewTargets", "Player emplaced",
-//					"posX", posX, "posY", posY, "minDistance", minDistance);
-//			}
-//		}
-//
-//		//	else if (itp != players_in_range.end()) {
-//				// Remove player from the range
-//		//		RemoveRangePlayer(itp);
-//		//	}
-//	}
-//
-//	// Process NPCs in the map
-//	for (const auto& nm : npcs_in_map) {
-//		int npcId = nm.second->id;
-//		auto itn = npcs_in_range.find(npcId);
-//		bool inRange = IsInRange(nm.second->posX, nm.second->posY);
-//
-//		if (inRange) {
-//			if (itn == npcs_in_range.end()) {
-//				// Add NPC to the range if not already present
-//				npcs_in_range.emplace(npcId, std::make_pair(nm.second->posX, nm.second->posY));
-//			}
-//		}
-//		//else if (itn != npcsh_in_range.end()) {
-//			// Remove NPC from the range
-//		//	RemoveRangeNpc(npcId);
-//		//}
-//	}
-//}
-
 void PlayLocalWav(int wav) {
-	std::string packet = pm::build_TW(wav, user_pos_x, user_pos_y);
+	std::string packet = pm::build_TW(wav, userX, userY);
 	SendToClient(packet);
 }
 
@@ -1092,6 +985,3 @@ BOOL StartsWithAndNot(BSTR sValue, const WCHAR* pszSubValue, const WCHAR* npszSu
 
 	return wcsncmp(sValue, pszSubValue, subValueLen) == 0 && wcsncmp(sValue, npszSubValue, nsubValueLen) != 0;
 }
-
-
-
