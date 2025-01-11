@@ -17,7 +17,7 @@ public:
 	const int unk1 = 999;
 	const int unk2 = 0;
 	const int unk3 = 10;
-
+	bool isDead;
 };
 
 //0.body-

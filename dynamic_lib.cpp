@@ -21,6 +21,7 @@ int userPID = 0;
 int userBCR = 0;
 bool userParalized = false;
 bool userMeditando = false;
+bool insecureMap = false;
 
 std::atomic<bool> lockM1234{ false };
 
@@ -33,7 +34,8 @@ std::unordered_set<std::string> whiteSpells = {
 	"Remover paralisis",
 	"Invisibilidad",
 	"Celeridad",
-	"Fuerza"
+	"Fuerza",
+	"Curar veneno"
 };
 
 const std::string Remo = "Remover paralisis";
@@ -49,8 +51,7 @@ const std::string Cele = "Celeridad";
 const std::string Fue = "Fuerza";
 const std::string EleA = "Invocar elemental de agua";
 
-std::unordered_set<int> npcsBodyToAvoid =
-{
+std::unordered_set<int> npcsBodyToAvoid = {
 	154, //ele agua
 	15, //guardia impe
 	268, //guardia caos
@@ -67,17 +68,25 @@ bool lh_flag = false;
 bool autoCast = false;
 bool toogleAutoCast = false;
 bool directCast = false;
-
+bool avoidInviCast = false;
+bool lockLastTarget = false;
+bool flagLastTarget = false;
+bool isSelLhWhite = false;
 
 int selectedPid = 0;
 int selectedNid = 0;
 int selectedLH = 0;
-bool isSelLhWhite = false;
+int lastTargetPID = 0;
 
 const int WAV_SCREEN_CAPTURE = 555;
 const int WAV_PRC_PPL_PPP = 324;
 const int WAV_FEATURE_ON = 194;
 const int WAV_FEATURE_OFF = 199;
+const int WAV_CC_TRIGGER = 100;
+const int WAV_BP_TRIGGER = 101;
+
+const int BODY_DEAD1 = 8;
+const int BODY_DEAD2 = 145;
 
 std::unordered_map<int, std::shared_ptr<Npc>> rngNpcs;
 std::unordered_map<int, std::shared_ptr<Npc>> mapNpcs;
@@ -124,10 +133,12 @@ VOID WINAPI MyRecvData(BSTR dataRecv)
 		PlayLocalWav(WAV_SCREEN_CAPTURE);
 		HideCheat(true);
 		PlayLocalWav(WAV_PRC_PPL_PPP);
+		dlg.logDebug("MyRecvData - CAUTION! PAIN", "hidecheat", hideCheating, "radar run", isRadarRunning);
 	}
 
 	if (StartsWith(dataRecv, { L"PRC", L"PPP", L"PPL" })) {
 		PlayLocalWav(WAV_PRC_PPL_PPP);
+		dlg.logDebug("MyRecvData - CAUTION! PRC PPP PPL", "hidecheat", hideCheating, "radar run", isRadarRunning);
 	}
 
 	if (StartsWith(dataRecv, L"LH")) {
@@ -135,7 +146,7 @@ VOID WINAPI MyRecvData(BSTR dataRecv)
 		lh_flag = false;
 		isSelLhWhite = false;
 		autoCast = false;
-		//directCast = false;
+		//flagLastTarget = false;
 		avoidPacketLog = true;
 	}
 
@@ -159,7 +170,8 @@ VOID WINAPI MyRecvData(BSTR dataRecv)
 	}
 
 	if (StartsWith(dataRecv, L"CM")) {
-		newMapChanged();
+		std::string packet = pm::ConvertBSTRPacket(dataRecv, 2);
+		Intercept_CM(packet);
 		avoidPacketLog = true;
 	}
 
@@ -174,6 +186,7 @@ VOID WINAPI MyRecvData(BSTR dataRecv)
 	if (StartsWith(dataRecv, L"CP")) {
 		std::string packet = pm::ConvertBSTRPacket(dataRecv, 2);
 		Intercept_CP(packet);
+		avoidPacketLog = true;
 	}
 
 	if (StartsWithAndNot(dataRecv, L"CR", L"CRA")) {
@@ -191,7 +204,7 @@ VOID WINAPI MyRecvData(BSTR dataRecv)
 	if (StartsWith(dataRecv, { L"MP", L"LP" })) {
 		std::string packet = pm::ConvertBSTRPacket(dataRecv, 2);
 		Intercept_MP(packet);
-		avoidPacketLog = false;
+		avoidPacketLog = true;
 	}
 
 	if (StartsWith(dataRecv, L"P9")) {
@@ -213,6 +226,19 @@ VOID WINAPI MyRecvData(BSTR dataRecv)
 	if (StartsWith(dataRecv, L"SHS")) {
 		std::string packet = pm::ConvertBSTRPacket(dataRecv, 3);
 		Intercept_SHS(packet);
+		avoidPacketLog = true;
+	}
+
+	if (StartsWith(dataRecv, L"||Has lanzado") && lockLastTarget) {
+		if (!flagLastTarget || lastTargetPID == 0) {
+			std::string packet = pm::ConvertBSTRPacket(dataRecv, 0);
+			Intercept_CastON(packet);
+		}
+		avoidPacketLog = true;
+	}
+
+	if (StartsWith(dataRecv, { L"AA", L"TW",L"EX",L"SHIV", L"SHII",
+		L"HO", L"OTII", L"OTIV", L"RTR", L"BQ" })) {
 		avoidPacketLog = true;
 	}
 
@@ -251,6 +277,14 @@ VOID WINAPI MySendData(BSTR* dataSend)
 		if (cast_mode == 1) {
 			std::string packet = pm::ConvertBSTRPacket(*dataSend, 2);
 			Intercept_LC(packet);
+		}
+		avoidPacketLog = true;
+	}
+
+	if (StartsWith(*dataSend, L"RC")) {
+		if (lockLastTarget) {
+			lastTargetPID = 0;
+			flagLastTarget = false;
 		}
 		avoidPacketLog = true;
 	}
@@ -296,6 +330,8 @@ int WINAPI MyLoop()
 		}
 
 		if ((GetKeyState(VK_F1) & 0x100) != 0) {
+			autoCast = false;
+			toogleAutoCast = false;
 			directCast = !directCast;
 
 			if (directCast)
@@ -319,8 +355,31 @@ int WINAPI MyLoop()
 			Sleep(15);
 		}
 
+		if ((GetKeyState(VK_F3) & 0x100) != 0) {
+			avoidInviCast = !avoidInviCast;
+
+			if (avoidInviCast)
+				PlayLocalWav(WAV_FEATURE_ON);
+			else
+				PlayLocalWav(WAV_FEATURE_OFF);
+
+			Sleep(15);
+		}
+
+		//if ((GetKeyState(VK_F3) & 0x100) != 0) {
+			//lockLastTarget = !lockLastTarget;
+
+			//if (lockLastTarget)
+			//	PlayLocalWav(WAV_FEATURE_ON);
+			//else
+			//	PlayLocalWav(WAV_FEATURE_OFF);
+
+			//Sleep(15);
+		//}
+
 		if ((GetKeyState(VK_XBUTTON2) & 0x100) != 0) {
 			toogleAutoCast = false;
+			directCast = false;
 			autoCast = true;
 		}
 
@@ -379,7 +438,7 @@ void HideCheat(bool finalizeRadar) {
 	Sleep(35);
 }
 
-void newMapChanged() {
+void Intercept_CM(const std::string& packet) {
 	mapPlayers.clear();
 	rngPlayers.clear();
 
@@ -388,6 +447,9 @@ void newMapChanged() {
 
 	selectedNid = 0;
 	selectedPid = 0;
+
+	auto pinfo = pm::split(packet, ',');
+	insecureMap = pinfo[1] != "0";
 }
 
 void Intercept_SHS(const std::string& packet) {
@@ -455,6 +517,8 @@ void Intercept_CC(BSTR& dataRecv, const std::string& packet) {
 	auto pinfo = pm::split(packet, ',');
 	int pid = stoi(pinfo[3]);
 
+	if (mapPlayers.count(pid) > 0) return;
+
 	if (pinfo[11] == userName) {
 
 		userPID = pid;
@@ -492,23 +556,37 @@ void Intercept_CP(const std::string& packet) {
 
 		if (itpm->second->head != head)
 			itpm->second->head = head;
+
+		itpm->second->isDead = itpm->second->body == BODY_DEAD1 || itpm->second->body == BODY_DEAD2;
 	}
 }
 
 void AddPlayer(int pid, bool detected, const std::vector<std::string>& pinfo) {
-	if (mapPlayers.count(pid) > 0) return;
+	//if (mapPlayers.count(pid) > 0) return;
 
 	auto pl = std::make_shared<Player>(pinfo, detected);
+	pl->isDead = pl->body == BODY_DEAD1 || pl->body == BODY_DEAD2;
+
 	mapPlayers.emplace(pid, pl);
 
 	if (IsInRange(pl->posX, pl->posY)) {
 		rngPlayers.emplace(pid, pl);
 	}
+
+	if (insecureMap) PlayLocalWav(WAV_CC_TRIGGER);
 }
 
-void RemoveMapPlayer(int pid) {
-	rngPlayers.erase(pid);
-	mapPlayers.erase(pid);
+bool RemoveMapPlayer(int pid) {
+	int hits = 0;
+	hits += rngPlayers.erase(pid);
+	hits += mapPlayers.erase(pid);
+
+	return hits > 0;
+}
+
+void RemoveMapPlayer(const std::unordered_map<int, std::shared_ptr<Player>>::iterator& it) {
+	rngPlayers.erase(it);
+	mapPlayers.erase(it);
 }
 
 void Intercept_MP(const std::string& packet) {
@@ -607,7 +685,7 @@ void Intercept_V3(BSTR& dataRecv, const std::string& packet) {
 
 	if (itp != mapPlayers.end()) {
 		auto& pl = itp->second;
-		if (pl->name == userName) return;
+		//if (pl->name == userName) return;
 
 		bool invi = pinfo[4] == "1";
 
@@ -618,6 +696,7 @@ void Intercept_V3(BSTR& dataRecv, const std::string& packet) {
 			pinfo[4] = "0";
 
 			SendToClient(pm::build_BP(pid));
+			Sleep(8);
 			SendToClient(pm::build_CC(pl));
 
 			SysFreeString(dataRecv);
@@ -630,6 +709,7 @@ void Intercept_V3(BSTR& dataRecv, const std::string& packet) {
 			pl->inviDetected = 0;
 
 			SendToClient(pm::build_BP(pid));
+			Sleep(8);
 			SendToClient(pm::build_CC(pl));
 		}
 	}
@@ -669,13 +749,17 @@ void Intercept_M1234(const std::string& packet) {
 
 void Intercept_BP(const std::string& packet) {
 	int eid = stoi(packet);
-	if (eid == userPID) return;
+	if (RemoveMapPlayer(eid)) {
+		if (insecureMap)
+			PlayLocalWav(WAV_BP_TRIGGER);
 
-	RemoveMapPlayer(eid);
+		return;
+	}
+
 	RemoveMapNpc(eid);
 }
 
-void Intercept_WLC(BSTR* dataSend, const std::string packet) {
+void Intercept_WLC(BSTR* dataSend, const std::string& packet) {
 	if (directCast) return;
 
 	auto pinfo = pm::split(packet, ',');
@@ -688,7 +772,10 @@ void Intercept_WLC(BSTR* dataSend, const std::string packet) {
 		int _posX = -1, _posY = -1;
 		std::tuple<int, int> xy = { -1, -1 };
 
-		if (toogleAutoCast && isSelLhWhite) {
+		if (lockLastTarget) {
+			xy = lastTargetPID > 0 ? GetLastTargetPos() : GetClosestTargetPos(posX, posY);
+		}
+		else if (toogleAutoCast && isSelLhWhite) {
 			xy = GetUserTargetPos();
 		}
 		else if (autoCast) {
@@ -712,6 +799,39 @@ void Intercept_WLC(BSTR* dataSend, const std::string packet) {
 		SysFreeString(*dataSend);
 		*dataSend = pm::ConvertStringToBSTR(pm::build_WLC(_posX, _posY));
 	}
+}
+
+void Intercept_CastON(const std::string& packet) {
+
+
+	auto pinfo_0 = pm::split(packet, ' ');
+	size_t p0size = pinfo_0.size();
+	std::string pinfo_0last = pinfo_0[p0size - 1];
+	auto pinfo_1 = pm::split(pinfo_0last, '~');
+	std::string pname = pinfo_1[0];
+
+	int pid = GetPlayerID(pname);
+	if (pid < 0) return;
+
+	lastTargetPID = pid;
+
+
+	//if (pinfo0[pinfo0.size() - 2] == "la")
+	//auto pinfo1 = pm::split(pinfo0[pinfo0.size() - 1], '~');
+	//std::string targetname = pinfo0[1];	
+}
+
+int GetPlayerID(const std::string& pname) {
+	for (const auto& pl : mapPlayers) {
+		if (pl.second->isDead) continue;
+		if (pl.second->bcr == userBCR) continue;
+
+		if (pl.second->name.find(pname) != std::string::npos) {
+			return pl.first;
+		}
+	}
+
+	return -1;
 }
 
 void Intercept_LH(const std::string& packet) {
@@ -747,8 +867,10 @@ void SetUserpos(int posX, int posY) {
 std::tuple<int, int> GetManualTargetPos() {
 	auto itp = rngPlayers.find(selectedPid);
 
-	if (itp != rngPlayers.end())
+	if (itp != rngPlayers.end()) {
+		//flagLastTarget = true;
 		return { itp->second->posX, itp->second->posY };
+	}
 
 	return { -1, -1 };
 }
@@ -758,6 +880,19 @@ std::tuple<int, int> GetUserTargetPos() {
 		return { -1, -1 };
 
 	return { userX, userY };
+}
+
+std::tuple<int, int> GetLastTargetPos() {
+	auto itrg = rngPlayers.find(lastTargetPID);
+	if (itrg != rngPlayers.end()) {
+
+		if (avoidInviCast && itrg->second->inviDetected)
+			return { -1, -1 };
+
+		return { itrg->second->posX, itrg->second->posY };
+	}
+
+	return { -1, -1 };
 }
 
 std::tuple<int, int> GetClosestTargetPos(int posX, int posY) {
@@ -774,13 +909,24 @@ std::tuple<int, int> GetClosestTargetPos(int posX, int posY) {
 		}
 	};
 
+	auto isValidTarget = [&](const std::shared_ptr<Player>& pl) -> bool {
+		if (pl->bcr == 1) return false;
+		if (pl->isDead) return false;
+		if (!isSelLhWhite && pl->bcr == userBCR) return false;
+		if (avoidInviCast && pl->inviDetected) return false;
+
+		return true;
+	};
+
 	for (const auto& pr : rngPlayers) {
-		if (pr.second->bcr == userBCR && !isSelLhWhite) continue;
+		if (!isValidTarget(pr.second)) continue;
 		updateClosest(pr.second->posX, pr.second->posY);
 	}
 
-	if (closestX > -1 && closestY > -1)
+	if (closestX > -1 && closestY > -1) {
+		flagLastTarget = lockLastTarget ? true : false;
 		return { closestX, closestY };
+	}
 
 	for (const auto& nr : rngNpcs) {
 		updateClosest(nr.second->posX, nr.second->posY);

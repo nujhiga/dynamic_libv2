@@ -1,6 +1,5 @@
 #include "stdafx.h"
 #include "PacketManager.h"
-#include "Utils.h"
 
 namespace PacketManager {
 

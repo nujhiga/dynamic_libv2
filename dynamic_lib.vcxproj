@@ -90,14 +90,11 @@
     <ClInclude Include="Npc.h" />
     <ClInclude Include="Player.h" />
     <ClInclude Include="PacketManager.h" />
-    <ClInclude Include="PlayerRange.h" />
     <ClInclude Include="RadarManager.h" />
     <ClInclude Include="resource.h" />
-    <ClInclude Include="Spell.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="User.h" />
-    <ClInclude Include="Utils.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dynamic_lib.cpp" />
@@ -115,13 +112,11 @@
     <ClCompile Include="Player.cpp" />
     <ClCompile Include="PacketManager.cpp" />
     <ClCompile Include="RadarManager.cpp" />
-    <ClCompile Include="Spell.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="User.cpp" />
-    <ClCompile Include="Utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="detours.lib" />
@@ -130,6 +125,7 @@
     <None Include="DlibLogger.tpp">
       <FileType>Document</FileType>
     </None>
+    <None Include="RadarManager.tpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

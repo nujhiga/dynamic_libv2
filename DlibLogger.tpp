@@ -20,3 +20,4 @@ void DlibLogger::formatArgs(std::ostringstream& oss, const std::string& varName,
     formatArgs(oss, varName, value);
     formatArgs(oss, std::forward<Args>(args)...);
 }
+

@@ -20,7 +20,6 @@
 
 #include "stdafx.h"
 #include "detours.h"
-#include "PlayerRange.h"
 #include "RadarManager.h"
 #include "PacketManager.h"
 #include "DlibLogger.h"
@@ -30,7 +29,6 @@
 #include "Npc.h"
 
 extern std::unordered_map<int, std::shared_ptr<Player>> mapPlayers;
-extern std::unordered_map<int, std::shared_ptr<Player>> rngPlayers;
 
 extern int userX;
 extern int userY;
@@ -50,7 +48,7 @@ BOOL StartsWithAndNot(BSTR sValue, const WCHAR* pszSubValue, const WCHAR* npszSu
 std::string hexToString(const std::string& hex);
 
 void HideCheat(bool finalizeRadar);
-void newMapChanged();
+void Intercept_CM(const std::string& packet);
 //VOID AutoRegenHpMan();
 
 void Intercept_SHS(const std::string& packet);
@@ -66,7 +64,8 @@ void RemoveMapNpc(int nid);
 void Intercept_CC(BSTR& dataRecv, const std::string& packet);
 void Intercept_CP(const std::string& packet);
 void AddPlayer(int pid, bool detected, const std::vector<std::string>& pinfo);
-void RemoveMapPlayer(int pid);
+bool RemoveMapPlayer(int pid);
+void RemoveMapPlayer(const std::unordered_map<int, std::shared_ptr<Player>>::iterator& it);
 
 void Intercept_MP(const std::string& packet);
 
@@ -84,7 +83,11 @@ void Intercept_M1234(const std::string& packet);
 
 void Intercept_BP(const std::string& packet);
 
-void Intercept_WLC(BSTR* dataSend, const std::string packet);
+void Intercept_WLC(BSTR* dataSend, const std::string& packet);
+
+void Intercept_CastON(const std::string& packet);
+
+int GetPlayerID(const std::string& pname);
 
 void Intercept_LH(const std::string& packet);
 
@@ -97,6 +100,7 @@ void SetUserpos(int posX, int posY);
 std::tuple<int, int> GetClosestTargetPos(int posX, int posY);
 std::tuple<int, int> GetManualTargetPos();
 std::tuple<int, int> GetUserTargetPos();
+std::tuple<int, int> GetLastTargetPos();
 
 void CheckPlayerTargets();
 void CheckNpcTargets();
