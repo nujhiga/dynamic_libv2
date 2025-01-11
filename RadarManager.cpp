@@ -34,12 +34,14 @@ void RadarManager::finalizeRadar() {
 
 void RadarManager::render() {
 
-	RECT radar = getScaleRect(RADAR_RECT_LEFT, RADAR_RECT_TOP, RADAR_RECT_RIGHT, RADAR_RECT_BOTTOM, RADAR_SCALE);
-	RECT mapLimits = getScaleRect(MAP_LIMITS_LEFT, MAP_LIMITS_TOP, MAP_LIMITS_RIGHT, MAP_LIMITS_BOTTOM, RADAR_SCALE);
-
 	while (running.load()) {
+
+		RECT radar = getScaleRect(RADAR_RECT_LEFT, RADAR_RECT_TOP, RADAR_RECT_RIGHT, RADAR_RECT_BOTTOM, RADAR_SCALE);
+		RECT mapLimits = getScaleRect(MAP_LIMITS_LEFT, MAP_LIMITS_TOP, MAP_LIMITS_RIGHT, MAP_LIMITS_BOTTOM, RADAR_SCALE);
+
 		RECT radarWnd;
 		GetClientRect(hWnd, &radarWnd);
+
 		RedrawWindow(hWnd, &radarWnd, NULL, RDW_ERASE | RDW_INVALIDATE | RDW_UPDATENOW);
 
 		FillRect(hdcWindow, &radar, radarBrush);
@@ -52,6 +54,13 @@ void RadarManager::render() {
 
 		Sleep(80);
 	}
+}
+
+void RadarManager::setDlibMessage(const std::wstring& message, int msduration) {
+	dlibMsgDuration = msduration;
+	dlibMsgStartAt = std::chrono::steady_clock::now();
+	dlibMsg = message;
+	showDlibMsg.store(true);
 }
 
 //private
@@ -87,9 +96,17 @@ void RadarManager::initBrushes() {
 }
 
 void RadarManager::initFont() {
-	int fsize = static_cast<int>((-MulDiv(FONT_SIZE, GetDeviceCaps(hdcWindow, LOGPIXELSY), 72)) * RADAR_SCALE);
+
+	int fsize = static_cast<int>((MulDiv(FONT_SIZE, GetDeviceCaps(hdcWindow, LOGPIXELSY), 72)) * RADAR_SCALE);
+
 	hFont = CreateFontW(fsize, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
 		OUT_OUTLINE_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Consolas");
+
+	int textTopOffset = fsize + TEXT_TOP_MARGIN;
+
+	textXYtop = (RADAR_RECT_TOP + RADAR_RECT_BOTTOM) * RADAR_SCALE;
+	textMapPlayersTop = textXYtop + textTopOffset;
+	textDlibMsgTop = textMapPlayersTop + textTopOffset;
 }
 
 void RadarManager::deleteBrushes() {
@@ -123,8 +140,20 @@ void RadarManager::renderTexts() {
 	std::wstring plsmap = getWstring("Players in map: ", mapPlayers.size());
 
 	SelectObject(hdcWindow, hFont);
-	TextOut(hdcWindow, 1, 155, posxy.c_str(), posxy.length());
-	TextOut(hdcWindow, 1, 175, plsmap.c_str(), plsmap.length());
+	TextOut(hdcWindow, 1, textXYtop, posxy.c_str(), posxy.length());
+	TextOut(hdcWindow, 1, textMapPlayersTop, plsmap.c_str(), plsmap.length());
+
+	if (!showDlibMsg.load() || dlibMsg.empty()) return;
+
+	auto now = std::chrono::steady_clock::now();
+
+	if (std::chrono::duration_cast<std::chrono::milliseconds>(now - dlibMsgStartAt).count() < dlibMsgDuration) {
+		TextOut(hdcWindow, 1, textDlibMsgTop, dlibMsg.c_str(), dlibMsg.length());
+	}
+	else {
+		showDlibMsg.store(false);
+		dlibMsg.clear();
+	}
 }
 
 void RadarManager::renderUser() {
@@ -138,7 +167,6 @@ void RadarManager::renderUser() {
 		user.right + widthOffset, user.bottom + heightOffset);
 
 	FrameRect(hdcWindow, &userVision, blackBrush);
-
 }
 
 HBRUSH RadarManager::getBrush(bool isDead, int bcr) {

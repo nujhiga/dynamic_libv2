@@ -65,7 +65,7 @@ std::unordered_set<int> npcsBodyToAvoid = {
 
 bool uk_flag = false;
 bool lh_flag = false;
-bool autoCast = false;
+//bool selfCast = false;
 bool toogleAutoCast = false;
 bool directCast = false;
 bool avoidInviCast = false;
@@ -145,7 +145,7 @@ VOID WINAPI MyRecvData(BSTR dataRecv)
 		uk_flag = false;
 		lh_flag = false;
 		isSelLhWhite = false;
-		autoCast = false;
+		//selfCast = false;
 		//flagLastTarget = false;
 		avoidPacketLog = true;
 	}
@@ -330,8 +330,8 @@ int WINAPI MyLoop()
 		}
 
 		if ((GetKeyState(VK_F1) & 0x100) != 0) {
-			autoCast = false;
 			toogleAutoCast = false;
+			lockLastTarget = false;
 			directCast = !directCast;
 
 			if (directCast)
@@ -343,9 +343,8 @@ int WINAPI MyLoop()
 		}
 
 		if ((GetKeyState(VK_F2) & 0x100) != 0) {
-			autoCast = false;
-			directCast = false;
 			toogleAutoCast = !toogleAutoCast;
+			radar.setDlibMessage(radar.getWstring("toogleAutoCast = ", toogleAutoCast));
 
 			if (toogleAutoCast)
 				PlayLocalWav(WAV_FEATURE_ON);
@@ -357,6 +356,7 @@ int WINAPI MyLoop()
 
 		if ((GetKeyState(VK_F3) & 0x100) != 0) {
 			avoidInviCast = !avoidInviCast;
+			radar.setDlibMessage(radar.getWstring("avoidInviCast = ", avoidInviCast));
 
 			if (avoidInviCast)
 				PlayLocalWav(WAV_FEATURE_ON);
@@ -366,21 +366,22 @@ int WINAPI MyLoop()
 			Sleep(15);
 		}
 
-		//if ((GetKeyState(VK_F3) & 0x100) != 0) {
-			//lockLastTarget = !lockLastTarget;
+		if ((GetKeyState(VK_F4) & 0x100) != 0) {
+			lockLastTarget = !lockLastTarget;
+			radar.setDlibMessage(radar.getWstring("lockLastTarget = ", lockLastTarget));
 
-			//if (lockLastTarget)
-			//	PlayLocalWav(WAV_FEATURE_ON);
-			//else
-			//	PlayLocalWav(WAV_FEATURE_OFF);
+			if (lockLastTarget)
+				PlayLocalWav(WAV_FEATURE_ON);
+			else
+				PlayLocalWav(WAV_FEATURE_OFF);
 
-			//Sleep(15);
-		//}
+			Sleep(15);
+		}
 
 		if ((GetKeyState(VK_XBUTTON2) & 0x100) != 0) {
 			toogleAutoCast = false;
 			directCast = false;
-			autoCast = true;
+		//	selfCast = true;
 		}
 
 		if ((GetKeyState(VK_XBUTTON1) & 0x100) != 0) {
@@ -778,9 +779,9 @@ void Intercept_WLC(BSTR* dataSend, const std::string& packet) {
 		else if (toogleAutoCast && isSelLhWhite) {
 			xy = GetUserTargetPos();
 		}
-		else if (autoCast) {
+		/*else if (selfCast) {
 			xy = GetUserTargetPos();
-		}
+		}*/
 		else if (cast_mode == 0) {
 			xy = GetClosestTargetPos(posX, posY);
 		}
